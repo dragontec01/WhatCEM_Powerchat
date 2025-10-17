@@ -1,0 +1,27 @@
+/* Hide number input spinners across all browsers */
+
+/* Chrome, Safari, Edge, Opera */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Firefox */
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* Additional fallback for any remaining spinner elements */
+.number-input-no-spinners::-webkit-outer-spin-button,
+.number-input-no-spinners::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+  display: none;
+}
+
+.number-input-no-spinners {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}

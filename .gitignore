@@ -1,0 +1,27 @@
+node_modules
+dist
+.DS_Store
+uploads
+public
+whatsapp-sessions
+vite.config.ts.*
+*.tar.gz
+*.zip
+*.md
+backups/
+/.idea/AugmentWebviewStateStore.xml
+/.idea/misc.xml
+/.idea/modules.xml
+/.idea/powerchatplus.iml
+/.idea/inspectionProfiles/Project_Default.xml
+/.idea/vcs.xml
+/.idea/workspace.xml
+
+# Kubernetes deployment secrets
+k8s/config/.db-password
+k8s/temp-*.yaml
+k8s/config/gcp-config-sg.env
+k8s/manifests/deployment-sg.yaml
+k8s/manifests/ingress-sa.yaml
+k8s/manifests/ingress-sg.yaml
+k8s/manifests/ingress-sa.yaml

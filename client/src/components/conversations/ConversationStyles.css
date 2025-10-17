@@ -1,0 +1,263 @@
+/* WhatsApp-like conversation background */
+.conversation-background {
+  background-color: #f5f1eb;
+  background-image: url('https://static.whatsapp.net/rsrc.php/v4/y1/r/a3pd-CgpXeU.png');
+  background-repeat: repeat;
+  background-size: auto;
+}
+
+/* Group chat participant name styling */
+.participant-name {
+  color: #00897b !important; /* WhatsApp teal for participant names */
+  font-weight: 500 !important;
+  font-size: 13px !important;
+  margin-bottom: 2px !important;
+}
+
+/* Conversation start indicator */
+.conversation-start-indicator {
+  background-color: #ffeaa7 !important;
+  color: #2d3436 !important;
+  border: 1px solid #fdcb6e !important;
+}
+
+/* Message grouping improvements */
+.message-group {
+  margin-bottom: 0.5rem;
+}
+
+.message-group .message-bubble:not(:last-child) {
+  margin-bottom: 0.125rem;
+}
+
+.message-group .message-bubble:last-child {
+  margin-bottom: 0;
+}
+
+/* Improved date separator styling */
+.date-separator {
+  position: relative;
+  text-align: center;
+  margin: 1.5rem 0;
+}
+
+.date-separator::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(0,0,0,0.1), transparent);
+  z-index: 0;
+}
+
+.date-separator span {
+  position: relative;
+  background: #f0f0f0;
+  color: #667781;
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  z-index: 1;
+}
+
+/* Message bubble improvements - WhatsApp Style */
+.chat-bubble-user {
+  position: relative;
+  word-wrap: break-word;
+  max-width: 100%;
+  background-color: #dcf8c6 !important; /* WhatsApp green for sent messages */
+  color: #303030 !important;
+  border-radius: 8px !important;
+}
+
+.chat-bubble-user::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  right: -6px;
+  width: 0;
+  height: 0;
+  border: 6px solid transparent;
+  border-left-color: #dcf8c6;
+  border-right: 0;
+  border-bottom: 0;
+  margin-top: -3px;
+  margin-right: -6px;
+}
+
+.chat-bubble-contact {
+  position: relative;
+  word-wrap: break-word;
+  max-width: 100%;
+  background-color: #ffffff !important; /* White for received messages */
+  color: #303030 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1) !important;
+}
+
+.chat-bubble-contact::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: -6px;
+  width: 0;
+  height: 0;
+  border: 6px solid transparent;
+  border-right-color: #ffffff;
+  border-left: 0;
+  border-bottom: 0;
+  margin-top: -3px;
+  margin-left: -6px;
+}
+
+/* Override any existing bubble colors */
+.bg-sky-500 {
+  background-color: #dcf8c6 !important;
+  color: #303030 !important;
+}
+
+.bg-sky-500.text-white {
+  color: #303030 !important;
+}
+
+.bg-white.chat-bubble-contact {
+  background-color: #ffffff !important;
+  color: #303030 !important;
+}
+
+/* Ensure proper text color in all cases */
+.chat-bubble-user *, 
+.chat-bubble-contact * {
+  color: inherit !important;
+}
+
+.chat-bubble-user .text-white,
+.bg-sky-500 .text-white {
+  color: #303030 !important;
+}
+
+.chat-bubble-user .text-sky-100,
+.bg-sky-500 .text-sky-100 {
+  color: #667781 !important;
+}
+
+/* WhatsApp message time styling */
+.message-time {
+  color: #667781 !important;
+  font-size: 11px !important;
+  opacity: 0.8;
+  font-weight: 400 !important;
+  white-space: nowrap;
+}
+
+/* Status icons for sent messages */
+.message-status {
+  color: #667781 !important;
+  font-size: 12px !important;
+  opacity: 0.8;
+}
+
+/* Specific styling for message time in sent messages */
+.chat-bubble-user .message-time {
+  color: #667781 !important;
+}
+
+.chat-bubble-user .message-status {
+  color: #667781 !important;
+}
+
+/* Specific styling for message time in received messages */
+.chat-bubble-contact .message-time {
+  color: #667781 !important;
+}
+
+.chat-bubble-contact .message-status {
+  color: #667781 !important;
+}
+
+/* Message status indicators */
+.message-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: 0.5rem;
+  opacity: 0.7;
+}
+
+.message-status.read {
+  color: #0ea5e9;
+}
+
+.message-status.delivered {
+  color: #6b7280;
+}
+
+.message-status.sent {
+  color: #6b7280;
+}
+
+.message-status.failed {
+  color: #ef4444;
+}
+
+/* Hover effects for message actions */
+.message-actions {
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: all 0.2s ease-in-out;
+  pointer-events: none;
+}
+
+.message-bubble:hover .message-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Smooth scrolling improvements */
+.messages-container {
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0,0,0,0.2) transparent;
+}
+
+.messages-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.messages-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.messages-container::-webkit-scrollbar-thumb {
+  background-color: rgba(0,0,0,0.2);
+  border-radius: 3px;
+}
+
+.messages-container::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(0,0,0,0.3);
+}
+
+/* Ensure message content doesn't overlap with timestamp */
+.message-content {
+  margin-bottom: 0.25rem;
+  padding-right: 1rem; /* Space for timestamp */
+}
+
+/* For messages with media or long content */
+.message-content:last-child {
+  margin-bottom: 0;
+}
+
+/* Better spacing for the timestamp row */
+.timestamp-row {
+  min-height: 16px;
+  align-items: flex-end;
+}
+
+/* Ensure proper text color inheritance */
+.bg-sky-500 .text-sky-100 {
+  color: rgba(255, 255, 255, 0.7) !important;
+}
