@@ -7,7 +7,7 @@
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\" --names \"backend,frontend\" --prefix-colors \"blue,green\" --kill-others-on-fail",
     "dev:integrated": "cross-env NODE_ENV=development tsx watch --clear-screen=false server/dev-server.ts",
     "dev:backend": "cross-env NODE_ENV=development tsx watch --clear-screen=false server/dev-server.ts",
-    "dev:frontend": "vite",
+    "dev:frontend": "vite --host",
     "dev:clean": "npm run clean && npm run dev",
     "clean": "rimraf dist node_modules/.vite",
     "dev:old": "npm run build:dev && cross-env NODE_ENV=development NODE_TLS_REJECT_UNAUTHORIZED=0 tsx --require dotenv/config server/index.ts",
