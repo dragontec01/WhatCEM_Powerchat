@@ -6,7 +6,7 @@ import crypto from 'crypto';
 import { CampaignService } from '../services/campaignService.js';
 import { requirePermission, requireAnyPermission } from '../middleware.js';
 import { db } from '../db.js';
-import { campaigns, campaignRecipients, campaignQueue, campaignMessages, contacts, channelConnections, whatsappAccounts } from '../../shared/schema.js';
+import { campaigns, campaignRecipients, campaignQueue, campaignMessages, contacts, channelConnections, whatsappAccounts } from '../../shared/db/schema';
 import { eq, sql, and, desc, inArray } from 'drizzle-orm';
 import * as XLSX from 'xlsx';
 import { createObjectCsvWriter } from 'csv-writer';

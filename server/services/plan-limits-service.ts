@@ -11,7 +11,7 @@ import {
   PlanAiProviderConfig,
   PlanAiUsageTracking,
   InsertPlanAiBillingEvent
-} from '@shared/schema';
+} from '@shared/db/schema';
 import { eq, and, desc, sql } from 'drizzle-orm';
 
 export interface PlanLimitCheck {

@@ -4,7 +4,7 @@ import {
   backupSchedules,
   inboxBackups,
   InsertBackupSchedule
-} from '@shared/schema';
+} from '@shared/db/schema';
 import { eq, and, lt, desc, sql } from 'drizzle-orm';
 import { inboxBackupService } from './inbox-backup';
 import { logger } from '../utils/logger';

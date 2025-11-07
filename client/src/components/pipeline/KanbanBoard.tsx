@@ -7,7 +7,7 @@ import BulkOperationsBar from '@/components/pipeline/BulkOperationsBar';
 import ImportExportModal from '@/components/pipeline/ImportExportModal';
 import { PipelineLoadingSkeleton } from '@/components/pipeline/PipelineSkeletons';
 import { EmptyPipelineState, EmptyDealsState, EmptyStageState } from '@/components/pipeline/EmptyStates';
-import { Deal, PipelineStage } from '@shared/schema';
+import { Deal, PipelineStage } from '@shared/db/schema';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/hooks/use-translation';

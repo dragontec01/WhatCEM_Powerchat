@@ -8,7 +8,7 @@ import {
   subscriptionNotifications,
   InsertDunningManagement,
   InsertSubscriptionNotification
-} from '@shared/schema';
+} from '@shared/db/schema';
 import { eq, and, lte, gte } from 'drizzle-orm';
 import { subscriptionManager } from './subscription-manager';
 import { gracePeriodService } from './grace-period-service';

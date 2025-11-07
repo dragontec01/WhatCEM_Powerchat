@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
-import { Contact } from "@shared/schema";
+import { Contact } from "@shared/db/schema";
 
 export function useProfilePicture() {
   const { toast } = useToast();

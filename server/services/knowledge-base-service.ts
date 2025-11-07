@@ -12,7 +12,7 @@ import {
   type InsertKnowledgeBaseDocument,
   type InsertKnowledgeBaseConfig,
   type InsertKnowledgeBaseUsage
-} from '../../shared/schema';
+} from '../../shared/db/schema';
 import { eq, and, desc, inArray } from 'drizzle-orm';
 import OpenAI from 'openai';
 import * as fs from 'fs/promises';

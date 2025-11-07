@@ -2,7 +2,7 @@ import { storage } from '../storage';
 import { db } from '../db';
 import {
   companies, subscriptionNotifications, InsertSubscriptionNotification
-} from '@shared/schema';
+} from '@shared/db/schema';
 import { eq, and, lte } from 'drizzle-orm';
 import { subscriptionManager } from './subscription-manager';
 import { logger } from '../utils/logger';

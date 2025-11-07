@@ -60,7 +60,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { useFlowContext } from "@/pages/flow-builder";
-import { PipelineStage } from "@shared/schema";
+import { PipelineStage } from "@shared/db/schema";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { standardHandleStyle } from './StyledHandle';

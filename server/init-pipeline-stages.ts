@@ -1,5 +1,5 @@
 import { storage } from './storage';
-import { PipelineStage } from '@shared/schema';
+import { PipelineStage } from '@shared/db/schema';
 
 const DEFAULT_STAGES = [
   { name: 'New Lead', color: '#3a86ff', order: 1 },

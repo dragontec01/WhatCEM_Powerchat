@@ -2,7 +2,7 @@ import { formatDistanceToNow, format, isToday, isYesterday } from 'date-fns';
 import { ContactAvatar } from '@/components/contacts/ContactAvatar';
 import { GroupAvatar } from '@/components/groups/GroupAvatar';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChannelConnection } from '@shared/schema';
+import { ChannelConnection } from '@shared/db/schema';
 import AgentAssignment from './AgentAssignment';
 import { useState, useMemo, useEffect } from 'react';
 import { apiRequest } from '@/lib/queryClient';

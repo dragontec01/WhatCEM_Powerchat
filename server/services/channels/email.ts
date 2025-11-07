@@ -15,7 +15,7 @@ import {
   EmailConfig,
   InsertEmailAttachment,
   ChannelConnection
-} from '@shared/schema';
+} from '@shared/db/schema';
 import { logger } from '../../utils/logger';
 import { broadcastToCompany } from '../../utils/websocket';
 import { eventEmitterMonitor } from '../../utils/event-emitter-monitor';

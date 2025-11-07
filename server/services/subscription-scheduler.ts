@@ -5,7 +5,7 @@ import { db } from '../db';
 import {
   companies,
   subscriptionNotifications
-} from '@shared/schema';
+} from '@shared/db/schema';
 import { eq, and, lte, isNull } from 'drizzle-orm';
 import { subscriptionManager } from './subscription-manager';
 import { gracePeriodService } from './grace-period-service';

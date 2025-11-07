@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { storage } from '../storage';
 import crypto from 'crypto';
-import { ApiKey } from '@shared/schema';
+import { ApiKey } from '@shared/db/schema';
 
 declare global {
   namespace Express {

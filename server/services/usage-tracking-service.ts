@@ -7,7 +7,7 @@ import {
   subscriptionNotifications,
   InsertSubscriptionUsageTracking,
   InsertSubscriptionNotification
-} from '@shared/schema';
+} from '@shared/db/schema';
 import { eq, and, gte } from 'drizzle-orm';
 import { subscriptionManager } from './subscription-manager';
 import { logger } from '../utils/logger';

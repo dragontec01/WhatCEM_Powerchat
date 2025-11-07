@@ -5,7 +5,7 @@ import {
   campaignTemplates,
   channelConnections,
   contacts
-} from '@shared/schema';
+} from '@shared/db/schema';
 import { and, asc, eq, inArray, lte, sql } from 'drizzle-orm';
 import path from 'path';
 import { db } from '../db';

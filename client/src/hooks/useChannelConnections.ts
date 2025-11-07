@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { ChannelConnection } from '@shared/schema';
+import { ChannelConnection } from '@shared/db/schema';
 import { useAuth } from './use-auth';
 
 export function useChannelConnections() {

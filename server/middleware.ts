@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { storage } from "./storage";
-import { User as SelectUser, Company, PERMISSIONS, DEFAULT_ROLE_PERMISSIONS } from "@shared/schema";
+import { User as SelectUser, Company, PERMISSIONS, DEFAULT_ROLE_PERMISSIONS } from "@shared/db/schema";
 import { planLimitsService } from "./services/plan-limits-service";
 
 

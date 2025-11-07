@@ -1,9 +1,9 @@
 import express from 'express';
 import { storage } from '../storage';
 import { ensureAuthenticated, requirePermission } from '../middleware';
-import { PERMISSIONS } from '@shared/schema';
+import { PERMISSIONS } from '@shared/db/schema';
 import { db } from '../db';
-import { campaignTemplates, channelConnections } from '@shared/schema';
+import { campaignTemplates, channelConnections } from '@shared/db/schema';
 import { eq, and, desc } from 'drizzle-orm';
 import axios from 'axios';
 import { logger } from '../utils/logger';

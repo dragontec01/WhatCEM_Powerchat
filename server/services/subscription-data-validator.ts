@@ -1,5 +1,5 @@
 import { db } from '../db';
-import { companies, Company } from '@shared/schema';
+import { companies, Company } from '@shared/db/schema';
 import { eq, isNull, or, and, lte } from 'drizzle-orm';
 import { logger } from '../utils/logger';
 

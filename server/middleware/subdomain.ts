@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { storage } from "../storage";
-import { Company } from "@shared/schema";
+import { Company } from "@shared/db/schema";
 
 
 const subdomainLookupCache = new Map<string, { company: Company | null; timestamp: number }>();

@@ -5,7 +5,7 @@ import {
   channelConnections, flows, deals,
   pipelineStages, companySettings, paymentTransactions, teamInvitations,
   googleCalendarTokens, companyPages
-} from '../../shared/schema';
+} from '../../shared/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import * as fs from 'fs';
 import * as path from 'path';

@@ -1,6 +1,6 @@
 import { Pinecone, type RecordMetadata } from '@pinecone-database/pinecone';
 import { db } from '../db';
-import { flows } from '../../shared/schema';
+import { flows } from '../../shared/db/schema';
 import { eq } from 'drizzle-orm';
 
 interface PineconeCredentials {

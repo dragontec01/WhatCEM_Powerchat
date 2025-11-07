@@ -4,7 +4,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { MoreHorizontal, User, Clock, Calendar, Tag } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import HighlightedText from '@/components/ui/highlighted-text';
-import { Deal } from '@shared/schema';
+import { Deal } from '@shared/db/schema';
 import { apiRequest } from '@/lib/queryClient';
 import { useLocation } from 'wouter';
 import { useToast } from '@/hooks/use-toast';

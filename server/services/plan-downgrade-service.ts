@@ -13,7 +13,7 @@ import {
   campaigns,
   InsertSubscriptionEvent,
   InsertSubscriptionNotification
-} from '@shared/schema';
+} from '@shared/db/schema';
 import { eq, and, gt, desc, asc, count } from 'drizzle-orm';
 import { subscriptionManager } from './subscription-manager';
 import { usageTrackingService } from './usage-tracking-service';

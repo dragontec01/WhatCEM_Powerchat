@@ -3,7 +3,7 @@ import { Request, Response, NextFunction } from 'express';
 import { autoUpdateService } from '../services/auto-update-service';
 import { storage } from '../storage';
 import { logger } from '../utils/logger';
-import { User } from '@shared/schema';
+import { User } from '@shared/db/schema';
 
 
 const requireAuth = (req: Request, res: Response, next: NextFunction) => {

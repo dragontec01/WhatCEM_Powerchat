@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { MoreHorizontal, Edit2, Trash2, TrendingUp, DollarSign, Clock } from 'lucide-react';
-import { PipelineStage, Deal } from '@shared/schema';
+import { PipelineStage, Deal } from '@shared/db/schema';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {

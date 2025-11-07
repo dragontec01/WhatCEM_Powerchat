@@ -7,7 +7,7 @@ import fetch from 'node-fetch';
 import { storage } from '../storage';
 import { migrationSystem } from '../migration-system';
 import { logger } from '../utils/logger';
-import { SystemUpdate, UpdateStatus } from '@shared/schema';
+import { SystemUpdate, UpdateStatus } from '@shared/db/schema';
 
 interface UpdatePackage {
   version: string;

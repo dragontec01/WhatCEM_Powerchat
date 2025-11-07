@@ -6,7 +6,7 @@ import {
   InsertSubscriptionEvent,
   InsertPaymentTransaction,
   InsertDunningManagement, InsertSubscriptionNotification
-} from '@shared/schema';
+} from '@shared/db/schema';
 import Stripe from 'stripe';
 import { EventEmitter } from 'events';
 

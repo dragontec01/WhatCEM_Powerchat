@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { planLimitsService } from '../services/plan-limits-service';
-import { User as SelectUser } from '@shared/schema';
+import { User as SelectUser } from '@shared/db/schema';
 
 /**
  * Middleware to enforce subscription expiration

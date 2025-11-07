@@ -4,7 +4,7 @@ import {
   InsertConversation,
   InsertContact,
   ChannelConnection as SchemaChannelConnection,
-} from '@shared/schema';
+} from '@shared/db/schema';
 import { EventEmitter } from 'events';
 import axios, { AxiosError } from 'axios';
 import crypto from 'crypto';

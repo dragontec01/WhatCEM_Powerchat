@@ -1,7 +1,7 @@
 import { randomBytes, createHash } from 'crypto';
 import { db } from '../db';
 import { storage } from '../storage';
-import { passwordResetTokens, users, type InsertPasswordResetToken } from '../../shared/schema';
+import { passwordResetTokens, users, type InsertPasswordResetToken } from '../../shared/db/schema';
 import { eq, and, gt, lt, isNull } from 'drizzle-orm';
 import { sendEmail } from './email';
 

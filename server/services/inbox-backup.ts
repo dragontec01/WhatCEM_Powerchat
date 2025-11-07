@@ -9,7 +9,7 @@ import {
   InsertBackupSchedule,
   InsertInboxRestore,
   InsertBackupAuditLog
-} from '@shared/schema';
+} from '@shared/db/schema';
 import { eq, and, desc, gte, lte } from 'drizzle-orm';
 import fs from 'fs/promises';
 import path from 'path';

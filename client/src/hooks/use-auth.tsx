@@ -1,6 +1,6 @@
 import { createContext, ReactNode, useContext } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { User as SelectUser, Company, insertUserSchema } from "@shared/schema";
+import { User as SelectUser, Company, insertUserSchema } from "@shared/db/schema";
 import { queryClient, getQueryFn, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";

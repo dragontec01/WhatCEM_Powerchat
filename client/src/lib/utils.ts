@@ -1,6 +1,6 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { ChannelConnection, Contact } from "@shared/schema";
+import { ChannelConnection, Contact } from "@shared/db/schema";
  
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));

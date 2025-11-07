@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db';
-import { quickReplyTemplates } from '../../shared/schema';
+import { quickReplyTemplates } from '../../shared/db/schema';
 import { eq, and, asc } from 'drizzle-orm';
 import { ensureAuthenticated } from '../middleware';
 

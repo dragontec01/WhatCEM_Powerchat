@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { Message, Contact, Conversation, ChannelConnection } from '@shared/schema';
+import { Message, Contact, Conversation, ChannelConnection } from '@shared/db/schema';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as crypto from 'crypto';

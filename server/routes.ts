@@ -6,15 +6,16 @@ import {
   insertContactSchema,
   InsertConversation,
   insertConversationSchema,
-  insertFlowAssignmentSchema,
-  insertFlowSchema,
   insertMessageSchema,
-  insertNoteSchema,
-  invitationStatusTypes,
   messages,
   PERMISSIONS,
-  User
-} from "@shared/schema";
+  User,
+  insertFlowAssignmentSchema,
+  insertFlowSchema,
+  insertNoteSchema,
+  invitationStatusTypes,
+  insertCompanyPageSchema
+} from "@shared/db/schema";
 import crypto, { randomBytes, scrypt, timingSafeEqual } from "crypto";
 import { eq } from "drizzle-orm";
 import { EventEmitter } from "events";
@@ -40,7 +41,6 @@ import { affiliateTrackingMiddleware } from "./middleware/affiliate-tracking";
 import { requireSubdomainAuth, subdomainMiddleware } from "./middleware/subdomain";
 import { isWhatsAppGroupChatId } from "./utils/whatsapp-group-filter";
 import { validatePhoneNumber as validatePhoneNumberUtil } from "./utils/phone-validation";
-import { insertCompanyPageSchema } from "@shared/schema";
 import { registerPaymentRoutes } from "./payment-routes";
 import { registerPlanRoutes } from "./plan-routes";
 import { setupPlanAiProviderRoutes } from "./routes/admin/plan-ai-provider-routes";
@@ -1259,7 +1259,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/users/change-password', ensureAuthenticated, async (req, res) => {
     try {
-      const userId = req.user?.id;
+      const userId = (req.user as User)?.id;
       if (!userId) {
         return res.status(401).json({ message: 'Unauthorized' });
       }
@@ -1313,7 +1313,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/users/me/notifications', ensureAuthenticated, async (req, res) => {
     try {
-      const userId = req.user?.id;
+      const userId = (req.user as User)?.id;
       if (!userId) {
         return res.status(401).json({ message: 'Unauthorized' });
       }
@@ -1335,7 +1335,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch('/api/users/me/notifications', ensureAuthenticated, async (req, res) => {
     try {
-      const userId = req.user?.id;
+      const userId = (req.user as User)?.id;
       if (!userId) {
         return res.status(401).json({ message: 'Unauthorized' });
       }
@@ -1363,7 +1363,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put('/api/user/language', ensureAuthenticated, async (req, res) => {
     try {
-      const userId = req.user?.id;
+      const userId = (req.user as User)?.id;
       if (!userId) {
         return res.status(401).json({ message: 'Unauthorized' });
       }
@@ -1494,7 +1494,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/users/me/avatar', ensureAuthenticated, upload.single('avatar'), async (req, res) => {
     try {
-      const userId = req.user?.id;
+      const userId = (req.user as User)?.id;
       if (!userId) {
         return res.status(401).json({ message: 'Unauthorized' });
       }
@@ -6559,7 +6559,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const contactId = parseInt(req.params.contactId);
       const companyId = req.user?.companyId;
-      const userId = req.user?.id;
+      const userId = (req.user as User)?.id;
       const { title, description, priority, status, dueDate, assignedTo, category, tags } = req.body;
 
       if (!companyId || !userId) {
@@ -6620,7 +6620,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const contactId = parseInt(req.params.contactId);
       const companyId = req.user?.companyId;
-      const userId = req.user?.id;
+      const userId = (req.user as User)?.id;
       const { taskIds, updates } = req.body;
 
       if (!companyId || !userId) {
@@ -6687,7 +6687,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const contactId = parseInt(req.params.contactId);
       const taskId = parseInt(req.params.taskId);
       const companyId = req.user?.companyId;
-      const userId = req.user?.id;
+      const userId = (req.user as User)?.id;
 
       if (!companyId || !userId) {
         return res.status(400).json({ error: 'Company ID and User ID required' });
@@ -6736,7 +6736,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const contactId = parseInt(req.params.contactId);
       const taskId = parseInt(req.params.taskId);
       const companyId = req.user?.companyId;
-      const userId = req.user?.id;
+      const userId = (req.user as User)?.id;
 
       if (!companyId || !userId) {
         return res.status(400).json({ error: 'Company ID and User ID required' });
@@ -9126,7 +9126,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const flowData = validateBody(insertFlowSchema, {
         ...req.body,
-        userId: typeof req.user?.id === 'number' ? req.user.id : (() => { res.status(400).json({ message: 'User ID is required' }); throw new Error('User ID is required'); })(),
+        userId: typeof (req.user as User)?.id === 'number' ? req.user.id : (() => { res.status(400).json({ message: 'User ID is required' }); throw new Error('User ID is required'); })(),
         companyId: company.id,
         status: req.body.status || 'draft'
       });
@@ -14719,7 +14719,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const activity = await storage.createDealActivity({
         ...req.body,
         dealId,
-        userId: req.user?.id || 1
+        userId: (req.user as User)?.id || 1
       });
 
       return res.status(201).json(activity);

@@ -1,5 +1,5 @@
 import {storage} from '../../storage';
-import {InsertMessage, InsertConversation, InsertContact} from '@shared/schema';
+import {InsertMessage, InsertConversation, InsertContact} from '@shared/db/schema';
 import {EventEmitter} from 'events';
 import axios from 'axios';
 import crypto from 'crypto';

@@ -6,7 +6,7 @@ import { db } from '../db';
 import {
   knowledgeBaseDocuments, type InsertKnowledgeBaseDocument,
   type InsertKnowledgeBaseConfig
-} from '../../shared/schema';
+} from '../../shared/db/schema';
 import { eq, and, desc } from 'drizzle-orm';
 import knowledgeBaseService from '../services/knowledge-base-service';
 import { TextDocumentProcessor } from '../services/document-processors/text-processor';

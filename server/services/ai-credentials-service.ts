@@ -11,7 +11,7 @@ import {
   InsertSystemAiCredential,
   InsertCompanyAiCredential,
   InsertAiCredentialUsage
-} from '@shared/schema';
+} from '@shared/db/schema';
 import { eq, and, desc, sql } from 'drizzle-orm';
 import crypto from 'crypto';
 import OpenAI from 'openai';

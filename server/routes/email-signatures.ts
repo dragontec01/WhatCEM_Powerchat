@@ -1,7 +1,7 @@
 import express from 'express';
 import { storage } from '../storage';
 import { ensureAuthenticated } from '../middleware';
-import { InsertEmailSignature, User as SelectUser } from '@shared/schema';
+import { InsertEmailSignature, User as SelectUser } from '@shared/db/schema';
 
 declare global {
   namespace Express {

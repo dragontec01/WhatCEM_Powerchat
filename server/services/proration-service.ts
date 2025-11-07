@@ -8,7 +8,7 @@ import {
   subscriptionUsageTracking,
   InsertSubscriptionPlanChange,
   InsertPaymentTransaction
-} from '@shared/schema';
+} from '@shared/db/schema';
 import { eq, and, lte } from 'drizzle-orm';
 import { subscriptionManager } from './subscription-manager';
 import { logger } from '../utils/logger';

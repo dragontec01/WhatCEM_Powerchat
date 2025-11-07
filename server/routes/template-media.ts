@@ -3,7 +3,7 @@ import multer, { FileFilterCallback } from 'multer';
 import path from 'path';
 import fs from 'fs/promises';
 import { ensureAuthenticated, requirePermission } from '../middleware';
-import { User as SelectUser } from '@shared/schema';
+import { User as SelectUser } from '@shared/db/schema';
 
 const router = express.Router();
 

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Loader2, RefreshCw } from "lucide-react";
-import { Contact } from "@shared/schema";
+import { Contact } from "@shared/db/schema";
 import { useProfilePicture } from "@/hooks/use-profile-picture";
 import { useTranslation } from "@/hooks/use-translation";
 import { 

@@ -12,7 +12,7 @@ import {
   InsertPlanAiProviderConfig,
   InsertPlanAiUsageTracking,
   InsertPlanAiBillingEvent
-} from '@shared/schema';
+} from '@shared/db/schema';
 import { eq, and, desc, sql } from 'drizzle-orm';
 
 export interface TokenUsageResult {

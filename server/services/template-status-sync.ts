@@ -1,5 +1,5 @@
 import { db } from '../db';
-import { campaignTemplates, channelConnections } from '@shared/schema';
+import { campaignTemplates, channelConnections } from '@shared/db/schema';
 import { eq, and, inArray } from 'drizzle-orm';
 import axios from 'axios';
 import { logger } from '../utils/logger';

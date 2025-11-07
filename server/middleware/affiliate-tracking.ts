@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { storage } from "../storage";
 import { db } from "../db";
-import { affiliates, affiliateReferrals, affiliateClicks } from "../../shared/schema";
+import { affiliates, affiliateReferrals, affiliateClicks } from "@shared/db/schema";
 import { eq, and } from "drizzle-orm";
 
 interface AffiliateTrackingData {

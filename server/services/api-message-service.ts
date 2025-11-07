@@ -1,5 +1,5 @@
 import { storage } from '../storage';
-import { ChannelConnection, InsertMessage, InsertConversation, InsertContact } from '@shared/schema';
+import { ChannelConnection, InsertMessage, InsertConversation, InsertContact } from '@shared/db/schema';
 import whatsAppService from './channels/whatsapp';
 import whatsAppOfficialService from './channels/whatsapp-official';
 import whatsAppTwilioService from './channels/whatsapp-twilio';

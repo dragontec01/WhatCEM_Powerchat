@@ -4,7 +4,7 @@ import {
   plans,
   Company,
   Plan
-} from '@shared/schema';
+} from '@shared/db/schema';
 import { eq, and, lte } from 'drizzle-orm';
 import { storage } from '../storage';
 import { logger } from '../utils/logger';

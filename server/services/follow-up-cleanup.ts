@@ -1,6 +1,6 @@
 import { storage } from '../storage';
 import { logger } from '../utils/logger';
-import { followUpSchedules, followUpExecutionLog } from '../../shared/schema';
+import { followUpSchedules, followUpExecutionLog } from '../../shared/db/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import { db } from '../db';
 

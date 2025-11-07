@@ -5,7 +5,7 @@ import {
   companies, 
   paymentTransactions,
   InsertPaymentTransaction
-} from '@shared/schema';
+} from '@shared/db/schema';
 import { eq } from 'drizzle-orm';
 import { subscriptionManager } from './subscription-manager';
 import { logger } from '../utils/logger';

@@ -37,7 +37,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/hooks/use-translation';
 import { apiRequest } from '@/lib/queryClient';
-import { Deal, PipelineStage } from '@shared/schema';
+import { Deal, PipelineStage } from '@shared/db/schema';
 
 interface BulkOperationsBarProps {
   selectedDeals: Deal[];

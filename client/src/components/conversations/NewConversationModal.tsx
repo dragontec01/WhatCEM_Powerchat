@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/hooks/use-translation';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
-import { ChannelConnection } from '@shared/schema';
+import { ChannelConnection } from '@shared/db/schema';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, MessageCircle, Phone, User } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';

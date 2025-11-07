@@ -24,7 +24,7 @@ import {
   InsertContact,
   Message,
   PERMISSIONS
-} from '@shared/schema';
+} from '@shared/db/schema';
 import pino from 'pino';
 import { EventEmitter } from 'events';
 import crypto from 'crypto';

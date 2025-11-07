@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { formatDistanceToNow, format } from 'date-fns';
-import { Deal } from '@shared/schema';
+import { Deal } from '@shared/db/schema';
 import { apiRequest } from '@/lib/queryClient';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';

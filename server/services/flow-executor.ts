@@ -4,7 +4,7 @@ import {
   Message,
   Contact,
   Conversation,
-  ChannelConnection} from '@shared/schema';
+  ChannelConnection} from '@shared/db/schema';
 import whatsAppService from './channels/whatsapp';
 import instagramService from './channels/instagram';
 import messengerService from './channels/messenger';

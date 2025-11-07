@@ -17,7 +17,7 @@ import {
   type InsertCampaign,
   type InsertCampaignTemplate,
   type InsertContactSegment
-} from '../../shared/schema';
+} from '../../shared/db/schema';
 
 interface CampaignFilters {
   status?: string;

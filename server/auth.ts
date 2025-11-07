@@ -5,7 +5,7 @@ import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
-import { User as SelectUser, Company } from "@shared/schema";
+import { User as SelectUser, Company } from "@shared/db/schema";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
 import { createAffiliateReferral } from "./middleware/affiliate-tracking";
@@ -873,13 +873,13 @@ export async function setupAuth(app: Express) {
             const now = new Date();
 
             switch (billingInterval) {
-              case 'year':
+              case 'annual':
                 subscriptionEndDate = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate());
                 break;
-              case 'quarter':
+              case 'quarterly':
                 subscriptionEndDate = new Date(now.getFullYear(), now.getMonth() + 3, now.getDate());
                 break;
-              case 'month':
+              case 'monthly':
               default:
                 subscriptionEndDate = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate());
                 break;

@@ -7,7 +7,7 @@ import {
   insertAffiliateCommissionStructureSchema,
   insertAffiliateReferralSchema,
   insertAffiliatePayoutSchema 
-} from "../../../shared/schema";
+} from "../../../shared/db/schema";
 
 
 const affiliateCreateSchema = z.object({

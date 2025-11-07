@@ -7,7 +7,7 @@ import messengerService from './channels/messenger';
 import instagramService from './channels/instagram';
 import TikTokService from './channels/tiktok';
 import emailService from './channels/email';
-import { Message } from '@shared/schema';
+import { Message } from '@shared/db/schema';
 
 export interface ChannelCapabilities {
   supportsReply: boolean;

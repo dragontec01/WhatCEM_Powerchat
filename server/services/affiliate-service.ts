@@ -7,7 +7,7 @@ import {
   companies,
   users,
   paymentTransactions
-} from "../../shared/schema";
+} from "../../shared/db/schema";
 import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
 import { convertAffiliateReferral } from "../middleware/affiliate-tracking";
 

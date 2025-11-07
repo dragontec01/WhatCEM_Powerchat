@@ -6,7 +6,7 @@ import { db } from '../db';
 import {
   companies,
   subscriptionEvents
-} from '@shared/schema';
+} from '@shared/db/schema';
 import { eq, desc, count } from 'drizzle-orm';
 import { subscriptionManager } from '../services/subscription-manager';
 import { subscriptionScheduler } from '../services/subscription-scheduler';

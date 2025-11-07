@@ -68,7 +68,7 @@ import {
   websiteAssets, type WebsiteAsset, type InsertWebsiteAsset,
 
   type DealStatus, type DealPriority,
-  type CompanySetting} from "@shared/schema";
+  type CompanySetting} from "@shared/db/schema";
 
 import session from "express-session";
 import { eq, and, desc, asc, or, sql, count, isNull, isNotNull, gt, gte, lt, lte, inArray, ne } from "drizzle-orm";
