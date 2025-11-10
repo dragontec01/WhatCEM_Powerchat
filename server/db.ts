@@ -7,7 +7,7 @@ import { secureEnv } from "./utils/secure-env";
 if (!secureEnv.validateIntegrity()) {
   throw new Error("Environment integrity check failed");
 }
-console.log({vars: process.env.PGSSLMODE, nodeEnv: process.env.NODE_ENV, dbUrl: process.env.DATABASE_URL});
+
 const sslConfig = () => {
   const sslMode = process.env.PGSSLMODE || 'disable';
   
