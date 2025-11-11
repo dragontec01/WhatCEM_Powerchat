@@ -228,6 +228,7 @@ export const users = pgTable("users", {
   fullName: text("full_name").notNull(),
   email: text("email").notNull(),
   avatarUrl: text("avatar_url"),
+  whatsapp_number: text("whatsapp_number"),
   role: userRoleEnum("role").default("agent"),
   companyId: integer("company_id").references(() => companies.id),
   isSuperAdmin: boolean("is_super_admin").default(false),

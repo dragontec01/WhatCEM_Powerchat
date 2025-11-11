@@ -101,7 +101,7 @@ app.use((req, res, next) => {
         if (process.env.NODE_ENV !== 'production') {
           logger.info('migration', 'Running database migrations...');
           try {
-            //await migrationSystem.runPendingMigrations();
+            // await migrationSystem.runPendingMigrations();
             logger.info('migration', 'Database migrations completed successfully');
           } catch (error) {
             logger.error('migration', '❌ Database migrations failed:', error);
