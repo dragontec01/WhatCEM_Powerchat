@@ -56,16 +56,28 @@ export const insertChannelConnectionSchema = createInsertSchema(channelConnectio
   historySyncError: true
 });
 
+export interface scheduleMilestone {
+  scheduleStart: String;
+  scheduleEnd: String;
+  scheduleIndex: number;
+  dayOfWeek: number;
+  color: string;
+  textColor: string;
+}
+
 export const assigns = pgTable("assigns", {
   id: serial("id").primaryKey(),
   assignName: text("assign_name"),
   companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: 'cascade' }),
+  useAdmins: boolean("use_admins").default(false),
+  relatedGroupId: integer("related_group_id").references(() => userGroups.id, { onDelete: 'set null' }),
   
   // Store schedule as JSONB for flexibility (following your pattern)
   schedule: jsonb("schedule").notNull().default('[]'), // Array of milestone schedules
   
   isActive: boolean("is_active").default(true),
   timeZone: integer("time_zone").default(-6), // Hours difference with UTC because more users are in Mexico
+  isDefault: boolean("is_default").default(false),
   
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -75,6 +87,10 @@ export const assigns = pgTable("assigns", {
 export const insertAssignSchema = createInsertSchema(assigns).pick({
   companyId: true,
   schedule: true,
+  useAdmins: true,
+  relatedGroupId: true,
+  assignName: true,
+  isDefault: true,
   isActive: true,
   timeZone: true,
   dateDown: true
@@ -85,11 +101,9 @@ export const assignUsers = pgTable("assign_users", {
   id: serial("id").primaryKey(),
   assignId: integer("assign_id").notNull().references(() => assigns.id, { onDelete: 'cascade' }),
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
-  relatedGroupId: integer("related_group_id").references(() => userGroups.id, { onDelete: 'set null' }),
-  groupName: text("group_name"),
   
-  // Store index_roles as JSONB array
-  indexRoles: jsonb("index_roles").notNull().default('[]'), // Array of {index: number, assigned: boolean}
+  // Store index_schedules as JSONB array
+  indexSchedules: jsonb("index_schedules").notNull().default('[]'), // Array of {index: number, assigned: boolean}
   
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow()
@@ -100,9 +114,7 @@ export const assignUsers = pgTable("assign_users", {
 export const insertAssignUserSchema = createInsertSchema(assignUsers).pick({
   assignId: true,
   userId: true,
-  relatedGroupId: true,
-  groupName: true,
-  indexRoles: true
+  indexSchedules: true
 });
 
 export type ChannelConnection = typeof channelConnections.$inferSelect;
