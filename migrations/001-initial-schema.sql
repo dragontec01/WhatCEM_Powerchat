@@ -529,6 +529,79 @@ COMMENT ON TABLE follow_up_execution_log IS 'Execution history and tracking for 
 COMMENT ON COLUMN follow_up_execution_log.execution_attempt IS 'Attempt number for retry tracking';
 COMMENT ON COLUMN follow_up_execution_log.response_received IS 'Whether recipient responded to follow-up';
 
+-- User groups and membership tables
+CREATE TABLE IF NOT EXISTS user_groups (
+  id SERIAL PRIMARY KEY,
+  company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT,
+  color TEXT DEFAULT '#3B82F6',
+  is_active BOOLEAN DEFAULT TRUE,
+  is_default BOOLEAN DEFAULT FALSE,
+  permissions JSONB DEFAULT '{}'::jsonb,
+  settings JSONB DEFAULT '{}'::jsonb,
+  max_members INTEGER,
+  tags TEXT[],
+  created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  updated_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS unique_group_name_per_company ON user_groups(company_id, name);
+CREATE INDEX IF NOT EXISTS idx_user_groups_company_id ON user_groups(company_id);
+CREATE INDEX IF NOT EXISTS idx_user_groups_created_by ON user_groups(created_by);
+
+CREATE TABLE IF NOT EXISTS user_group_members (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  group_id INTEGER NOT NULL REFERENCES user_groups(id) ON DELETE CASCADE,
+  role TEXT DEFAULT 'member',
+  is_active BOOLEAN DEFAULT TRUE,
+  joined_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  invited_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  member_settings JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS unique_user_group ON user_group_members(user_id, group_id);
+CREATE INDEX IF NOT EXISTS idx_user_group_members_user_id ON user_group_members(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_group_members_group_id ON user_group_members(group_id);
+
+-- Assigns / Assignment routing tables
+CREATE TABLE IF NOT EXISTS assigns (
+  id SERIAL PRIMARY KEY,
+  assign_name TEXT,
+  company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  use_admins BOOLEAN DEFAULT FALSE,
+  related_group_id INTEGER REFERENCES user_groups(id) ON DELETE SET NULL,
+  schedule JSONB NOT NULL DEFAULT '[]',
+  is_active BOOLEAN DEFAULT TRUE,
+  time_zone INTEGER DEFAULT -6,
+  is_default BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  date_down TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_assigns_company_id ON assigns(company_id);
+CREATE INDEX IF NOT EXISTS idx_assigns_is_default ON assigns(is_default) WHERE is_default = true;
+CREATE INDEX IF NOT EXISTS idx_assigns_is_active ON assigns(is_active) WHERE is_active = true;
+
+-- Assign users (many-to-many between assigns and users)
+CREATE TABLE IF NOT EXISTS assign_users (
+  id SERIAL PRIMARY KEY,
+  assign_id INTEGER NOT NULL REFERENCES assigns(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  index_schedules JSONB NOT NULL DEFAULT '[]',
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS unique_assign_user ON assign_users(assign_id, user_id);
+CREATE INDEX IF NOT EXISTS idx_assign_users_assign_id ON assign_users(assign_id);
+CREATE INDEX IF NOT EXISTS idx_assign_users_user_id ON assign_users(user_id);
 
 CREATE TABLE IF NOT EXISTS team_invitations (
   id SERIAL PRIMARY KEY,
@@ -719,6 +792,8 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
   ip_address INET,
   user_agent TEXT
 );
+
+
 
 -- Index for efficient token lookup and cleanup
 CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token ON password_reset_tokens(token);
@@ -2146,3 +2221,103 @@ COMMENT ON INDEX idx_conversations_group_jid IS 'Optimizes group conversation lo
 COMMENT ON INDEX idx_group_participants_conversation IS 'Optimizes group participant queries by conversation';
 COMMENT ON INDEX idx_group_participants_active IS 'Optimizes active group participant lookups';
 COMMENT ON INDEX idx_messages_group_participant IS 'Optimizes group message queries by sender JID';
+
+-- User groups and assigns domain
+-- These tables mirror the new Drizzle schema modules (user_groups, user_group_members, assigns, assign_users)
+
+CREATE TABLE IF NOT EXISTS user_groups (
+  id SERIAL PRIMARY KEY,
+  company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT,
+  color TEXT DEFAULT '#3B82F6',
+  is_active BOOLEAN DEFAULT TRUE,
+  is_default BOOLEAN DEFAULT FALSE,
+  permissions JSONB DEFAULT '{}',
+  settings JSONB DEFAULT '{}',
+  max_members INTEGER,
+  tags TEXT[],
+  created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  updated_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  UNIQUE(company_id, name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_groups_company_id ON user_groups(company_id);
+
+CREATE TABLE IF NOT EXISTS user_group_members (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  group_id INTEGER NOT NULL REFERENCES user_groups(id) ON DELETE CASCADE,
+  role TEXT DEFAULT 'member',
+  is_active BOOLEAN DEFAULT TRUE,
+  joined_at TIMESTAMP DEFAULT NOW(),
+  invited_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  member_settings JSONB DEFAULT '{}',
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  UNIQUE(user_id, group_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_group_members_user_id ON user_group_members(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_group_members_group_id ON user_group_members(group_id);
+
+CREATE TABLE IF NOT EXISTS assigns (
+  id SERIAL PRIMARY KEY,
+  assign_name TEXT,
+  company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  use_admins BOOLEAN DEFAULT FALSE,
+  related_group_id INTEGER REFERENCES user_groups(id) ON DELETE SET NULL,
+  schedule JSONB NOT NULL DEFAULT '[]',
+  is_active BOOLEAN DEFAULT TRUE,
+  time_zone INTEGER DEFAULT -6,
+  is_default BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  date_down TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_assigns_company_id ON assigns(company_id);
+CREATE INDEX IF NOT EXISTS idx_assigns_related_group_id ON assigns(related_group_id);
+
+CREATE TABLE IF NOT EXISTS assign_users (
+  id SERIAL PRIMARY KEY,
+  assign_id INTEGER NOT NULL REFERENCES assigns(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  related_group_id INTEGER REFERENCES user_groups(id) ON DELETE SET NULL,
+  group_name TEXT,
+  index_schedules JSONB NOT NULL DEFAULT '[]',
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  UNIQUE(assign_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_assign_users_assign_id ON assign_users(assign_id);
+CREATE INDEX IF NOT EXISTS idx_assign_users_user_id ON assign_users(user_id);
+
+-- Provide compatibility FK if channel_connections already has assign_id column
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'channel_connections' AND column_name = 'assign_id'
+  ) THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.table_constraints tc
+      JOIN information_schema.key_column_usage kcu ON tc.constraint_name = kcu.constraint_name
+      WHERE tc.table_schema = 'public' AND tc.table_name = 'channel_connections'
+        AND tc.constraint_type = 'FOREIGN KEY' AND kcu.column_name = 'assign_id'
+    ) THEN
+      BEGIN
+        ALTER TABLE public.channel_connections
+          ADD CONSTRAINT channel_connections_assign_id_fkey
+          FOREIGN KEY (assign_id) REFERENCES public.assigns(id)
+          ON DELETE SET NULL;
+      EXCEPTION WHEN OTHERS THEN
+        -- ignore errors (e.g. missing assigns table at time of running)
+        NULL;
+      END;
+    END IF;
+  END IF;
+END $$;
