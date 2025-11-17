@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
+import PhoneInput from 'react-phone-input-2';
+import 'react-phone-input-2/lib/style.css';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useTranslation } from '@/hooks/use-translation';
@@ -31,7 +33,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { queryClient, apiRequest } from '@/lib/queryClient';
-import { Loader2, User, Mail, Key, Check, Save, Upload, Calendar, Globe, Bell, BellOff } from 'lucide-react';
+import { Loader2, User, Mail, Key, Check, Save, Upload, Calendar, Globe, Bell, BellOff, Phone } from 'lucide-react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -49,6 +51,7 @@ interface UserProfile {
   id: number;
   username: string;
   fullName: string;
+  whatsappNumber?: string;
   email: string;
   avatarUrl?: string;
   role: string;
@@ -84,6 +87,7 @@ const profileFormSchema = z.object({
   fullName: z.string().min(2, "Name must be at least 2 characters"),
   email: z.string().email("Please enter a valid email address"),
   username: z.string().min(3, "Username must be at least 3 characters"),
+  whatsappNumber: z.string().optional(),
   languagePreference: z.string().optional(),
 });
 
@@ -151,21 +155,6 @@ const formatSaudiIBAN = (iban: string): string => {
 
 const companyFormSchema = z.object({
   name: z.string().min(2, "Company name must be at least 2 characters"),
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   primaryColor: z.string().optional(),
 });
 
@@ -206,6 +195,7 @@ export default function ProfilePage() {
       email: "",
       username: "",
       languagePreference: "",
+      whatsappNumber: "",
     },
   });
 
@@ -389,6 +379,7 @@ export default function ProfilePage() {
         email: user.email,
         username: user.username,
         languagePreference: user.languagePreference || currentLanguage?.code || 'en',
+        whatsappNumber: user.whatsappNumber || '',
       });
 
       if (user.company) {
@@ -644,6 +635,26 @@ export default function ProfilePage() {
                                 <div className="relative">
                                   <Mail className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                                   <Input className="pl-9" placeholder="your.email@example.com" {...field} />
+                                </div>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={profileForm.control}
+                          name="whatsappNumber"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>WhatsApp Number</FormLabel>
+                              <FormControl>
+                                <div className="relative">
+                                  <PhoneInput
+                                    country={'mx'}
+                                    value={`${field.value}`}
+                                    onChange={field.onChange}
+                                  />
                                 </div>
                               </FormControl>
                               <FormMessage />

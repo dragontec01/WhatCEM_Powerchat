@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useMutation } from '@tanstack/react-query';
+import PhoneInput from 'react-phone-input-2';
+import 'react-phone-input-2/lib/style.css';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -26,6 +28,7 @@ interface TeamMember {
   id: number;
   username: string;
   fullName: string;
+  whatsappNumber?: string;
   email: string;
   role: string;
 }
@@ -40,6 +43,7 @@ interface EditTeamMemberModalProps {
 export function EditTeamMemberModal({ isOpen, onClose, onSuccess, teamMember }: EditTeamMemberModalProps) {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
+  const [whatsappNumber, setWhatsappNumber] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState('agent');
@@ -50,6 +54,7 @@ export function EditTeamMemberModal({ isOpen, onClose, onSuccess, teamMember }: 
     if (teamMember && isOpen) {
       setFullName(teamMember.fullName);
       setEmail(teamMember.email);
+      setWhatsappNumber(teamMember.whatsappNumber || '');
       setPassword(''); // Always clear password field for security
       setShowPassword(false);
       setRole(teamMember.role);
@@ -60,6 +65,7 @@ export function EditTeamMemberModal({ isOpen, onClose, onSuccess, teamMember }: 
     mutationFn: async (data: {
       fullName: string;
       email: string;
+      whatsappNumber?: string;
       role: string;
       password?: string;
     }) => {
@@ -139,12 +145,14 @@ export function EditTeamMemberModal({ isOpen, onClose, onSuccess, teamMember }: 
 
     const updateData: {
       fullName: string;
+      whatsappNumber?: string;
       email: string;
       role: string;
       password?: string;
     } = {
       fullName,
       email,
+      whatsappNumber,
       role
     };
 
@@ -186,6 +194,21 @@ export function EditTeamMemberModal({ isOpen, onClose, onSuccess, teamMember }: 
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="edit-whatsappNumber">WhatsApp Number</Label>
+            <PhoneInput
+              country={'mx'}
+              value={whatsappNumber}
+              onChange={setWhatsappNumber}
+              inputStyle={{ width: "100%" }}
+              inputProps={{
+                name: 'whatsapp',
+                id: 'edit-whatsappNumber',
+                required: false,
+              }}
             />
           </div>
 

@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
+import PhoneInput from 'react-phone-input-2';
+import 'react-phone-input-2/lib/style.css';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -32,6 +34,7 @@ export function InviteTeamMemberModal({ isOpen, onClose, onSuccess }: InviteTeam
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
+  const [whatsappNumber, setWhatsappNumber] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState('agent');
@@ -42,6 +45,7 @@ export function InviteTeamMemberModal({ isOpen, onClose, onSuccess }: InviteTeam
       fullName: string;
       username: string;
       email: string;
+      whatsappNumber: string;
       password: string;
       role: string;
     }) => {
@@ -76,6 +80,7 @@ export function InviteTeamMemberModal({ isOpen, onClose, onSuccess }: InviteTeam
     setFullName('');
     setUsername('');
     setEmail('');
+    setWhatsappNumber('');
     setPassword('');
     setRole('agent');
   };
@@ -134,6 +139,7 @@ export function InviteTeamMemberModal({ isOpen, onClose, onSuccess }: InviteTeam
       fullName,
       username,
       email,
+      whatsappNumber,
       password,
       role
     });
@@ -183,6 +189,21 @@ export function InviteTeamMemberModal({ isOpen, onClose, onSuccess }: InviteTeam
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="whatsapp">WhatsApp Number</Label>
+            <PhoneInput
+              country={'mx'}
+              value={whatsappNumber}
+              onChange={setWhatsappNumber}
+              inputStyle={{ width: "100%" }}
+              inputProps={{
+                name: 'whatsapp',
+                id: 'edit-whatsappNumber',
+                required: false,
+              }}
             />
           </div>
 

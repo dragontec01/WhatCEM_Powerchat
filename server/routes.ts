@@ -40,7 +40,7 @@ import { ensureAuthenticated, getUserPermissions, requireAnyPermission, requireP
 import { affiliateTrackingMiddleware } from "./middleware/affiliate-tracking";
 import { requireSubdomainAuth, subdomainMiddleware } from "./middleware/subdomain";
 import { isWhatsAppGroupChatId } from "./utils/whatsapp-group-filter";
-import { validatePhoneNumber as validatePhoneNumberUtil } from "./utils/phone-validation";
+import { validatePhoneNumber, validatePhoneNumber as validatePhoneNumberUtil } from "./utils/phone-validation";
 import { registerPaymentRoutes } from "./payment-routes";
 import { registerPlanRoutes } from "./plan-routes";
 import { setupPlanAiProviderRoutes } from "./routes/admin/plan-ai-provider-routes";
@@ -11161,6 +11161,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const teamMemberSchema = z.object({
         fullName: z.string().min(1, 'Full name is required'),
         username: z.string().min(3, 'Username must be at least 3 characters'),
+        whatsappNumber: z.string().optional(),
         email: z.string().email('Valid email is required'),
         password: z.string().min(6, 'Password must be at least 6 characters'),
         role: z.string().refine(role => role === 'admin' || role === 'agent', {
@@ -11176,7 +11177,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const { fullName, username, email, password, role } = validationResult.data;
+      const { fullName, username, email, password, role, whatsappNumber } = validationResult.data;
 
       const existingUser = await storage.getUserByUsernameCaseInsensitive(username);
       if (existingUser) {
@@ -11188,11 +11189,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'A user with this email already exists' });
       }
 
+      if (whatsappNumber) {
+        const whatsappValidation = validatePhoneNumber(whatsappNumber);
+        if (!whatsappValidation.isValid) {
+          return res.status(400).json({ message: 'Invalid WhatsApp number format' });
+        }
+      }
+
       const hashedPassword = await hashPassword(password);
 
       const newUser = await storage.createUser({
         username,
         email,
+        whatsappNumber,
         fullName,
         password: hashedPassword,
         role,
@@ -11213,6 +11222,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const memberId = parseInt(req.params.id);
       const updateSchema = z.object({
         fullName: z.string().min(1, 'Full name is required').optional(),
+        whatsappNumber: z.string().optional(),
         email: z.string().email('Valid email is required').optional(),
         password: z.string().min(6, 'Password must be at least 6 characters').optional(),
         role: z.string().refine(role => role === 'admin' || role === 'agent', {
@@ -11247,6 +11257,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (updateData.password) {
         userUpdateData.password = await hashPassword(updateData.password);
+      }
+
+      if (updateData.whatsappNumber) {
+        const whatsappValidation = validatePhoneNumber(updateData.whatsappNumber);
+        if (!whatsappValidation.isValid) {
+          return res.status(400).json({ message: 'Invalid WhatsApp number format' });
+        }
+        userUpdateData.whatsappNumber = updateData.whatsappNumber;
       }
 
       const updatedUser = await storage.updateUser(memberId, userUpdateData);
