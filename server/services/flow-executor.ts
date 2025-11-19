@@ -13,6 +13,10 @@ import googleCalendarService from './google-calendar';
 import googleSheetsService from './google-sheets';
 import { dataCaptureService } from './data-capture-service';
 import axios from 'axios';
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import isBetween from "dayjs/plugin/isBetween";
+
 import { FlowExecutionManager } from './flow-execution-manager';
 import { FlowExecutionContext } from './flow-execution-context';
 import {
@@ -24,6 +28,9 @@ import {
 import { EventEmitter } from 'events';
 import * as path from 'path';
 import { isWhatsAppGroupChatId } from '../utils/whatsapp-group-filter';
+
+dayjs.extend(utc);
+dayjs.extend(isBetween)
 
 interface Flow {
   id: number;
@@ -12470,7 +12477,17 @@ ${eventResult.eventLink ? `\nView event: ${eventResult.eventLink}` : ''}`;
       console.error('Error sending WhatsApp interactive message:', error);
       throw error;
     }
+
   }
+
+  private async setUserByAssignment(channelConnection: ChannelConnection): Promise<ChannelConnection> {
+    const usersInAssign = await storage.getAssignedUsersWithAssignInfo(channelConnection.assignId as number);
+    if (usersInAssign.length > 0) {
+      const timeZone = usersInAssign[0]?.timeZone as number;
+    }
+    return channelConnection;
+  }
+
 }
 
 const flowExecutor = new FlowExecutor();

@@ -10535,6 +10535,38 @@ async updateRolePermissions(role: 'admin' | 'agent', permissions: Record<string,
       throw error;
     }
   }
+
+  async getAssignedUsersWithAssignInfo( assignId: number): Promise<Array<{
+    assignUsersId: number;
+    assignId: number;
+    userId: number;
+    companyId: number | null;
+    assignName: string | null;
+    isDefaultAssign: boolean | null;
+    timeZone: number | null;
+  } >> {
+    try {
+      const assignedUsers = await db
+        .select({
+          assignUsersId: assignUsers.id,
+          assignId: assignUsers.assignId,
+          userId: assignUsers.userId,
+
+          companyId: assigns.companyId,
+          assignName: assigns.assignName,
+          isDefaultAssign: assigns.isDefault,
+          timeZone: assigns.timeZone
+        })
+        .from(assignUsers)
+        .innerJoin(assigns, eq(assignUsers.assignId, assigns.id))
+        .where(eq(assignUsers.assignId, assignId));
+
+      return assignedUsers || [];
+    } catch (error) {
+      logger.error('storage', 'Error getting assigns with info');
+      throw error;
+    }
+  }
 }
 
 export const storage = new DatabaseStorage();
