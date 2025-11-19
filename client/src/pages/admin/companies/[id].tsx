@@ -1,5 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import PhoneInput from 'react-phone-input-2';
+import 'react-phone-input-2/lib/style.css';
 import { useLocation, useRoute } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { usePlans } from "@/hooks/use-plans";
@@ -96,6 +98,7 @@ interface User {
   username: string;
   fullName: string;
   email: string;
+  whatsappNumber?: string;
   role: string;
   avatarUrl?: string;
   companyId: number;
@@ -105,6 +108,7 @@ interface User {
 
 interface EditUserFormData {
   fullName: string;
+  whatsappNumber?: string;
   email: string;
   role: string;
   active: boolean;
@@ -196,6 +200,7 @@ export default function CompanyDetailPage() {
   const [isEditUserDialogOpen, setIsEditUserDialogOpen] = useState(false);
   const [editUserForm, setEditUserForm] = useState<EditUserFormData>({
     fullName: "",
+    whatsappNumber: "",
     email: "",
     role: "user",
     active: true,
@@ -254,11 +259,6 @@ export default function CompanyDetailPage() {
       active: true,
       planId: 0,
       maxUsers: 5,
-
-
-
-
-
     }
   });
 
@@ -274,11 +274,6 @@ export default function CompanyDetailPage() {
         active: company.active,
         planId: planId,
         maxUsers: company.maxUsers,
-
-
-
-
-
       });
     }
   }, [company, plans, form]);
@@ -450,6 +445,7 @@ export default function CompanyDetailPage() {
     setEditUserForm({
       fullName: user.fullName,
       email: user.email,
+      whatsappNumber: user.whatsappNumber || '',
       role: user.role,
       active: user.active ?? true,
     });
@@ -1063,6 +1059,22 @@ export default function CompanyDetailPage() {
                   value={editUserForm.email}
                   onChange={(e) => setEditUserForm({ ...editUserForm, email: e.target.value })}
                   className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="whatsappNumber" className="text-right">
+                  WhatsApp
+                </Label>
+                <PhoneInput
+                  country={'mx'}
+                  value={`${editUserForm.whatsappNumber}`}
+                  onChange={(value) => setEditUserForm({ ...editUserForm, whatsappNumber: value })}
+                  inputStyle={{ width: "335%" }}
+                  inputProps={{
+                    name: 'whatsapp',
+                    id: "whatsappNumber",
+                    required: false,
+                  }}
                 />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">

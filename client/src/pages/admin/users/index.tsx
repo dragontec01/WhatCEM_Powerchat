@@ -29,6 +29,7 @@ import { useToast } from "@/hooks/use-toast";
 interface User {
   id: number;
   username: string;
+  whatsappNumber?: string;
   email: string;
   fullName: string;
   role: string;

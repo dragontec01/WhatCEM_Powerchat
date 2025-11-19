@@ -24,9 +24,6 @@ if (process.env.NODE_ENV === 'production') {
 const app = express();
 
 
-
-
-
 app.set('trust proxy', true);
 
 if (process.env.NODE_ENV === 'production') {
@@ -278,6 +275,14 @@ app.use((req, res, next) => {
           logger.error('template-status-sync', '❌ WhatsApp Template Status Sync failed to start:', error);
         }
 
+        try {
+          const DefaultsManager = (await import('./services/defaults-manager')).DefaultsManager;
+          const defaultsManager = new DefaultsManager();
+          await defaultsManager.initialize();
+          logger.info('startup', '✅ Default groups and assigns created/checked successfully');
+        } catch (error) {
+          logger.error('startup', '❌ Error creating/checking default groups and assigns:', error);
+        }
       } catch (error) {
         logger.error('startup', 'Error during service initialization', error);
       }

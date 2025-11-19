@@ -3,6 +3,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import PhoneInput from "react-phone-input-2";
+import 'react-phone-input-2/lib/style.css';
 import { Loader2, ArrowLeft, Save } from "lucide-react";
 import AdminLayout from "@/components/admin/AdminLayout";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -38,6 +40,7 @@ interface Company {
 const userSchema = z.object({
   username: z.string().email("Username must be a valid email address"),
   email: z.string().email("Email must be a valid email address"),
+  whatsappNumber: z.string().optional(),
   fullName: z.string().min(2, "Full name must be at least 2 characters"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   confirmPassword: z.string(),
@@ -189,7 +192,7 @@ export default function NewUserPage() {
                       </FormItem>
                     )}
                   />
-                  
+
                   <FormField
                     control={form.control}
                     name="email"
@@ -198,6 +201,26 @@ export default function NewUserPage() {
                         <FormLabel>Email</FormLabel>
                         <FormControl>
                           <Input placeholder="user@example.com" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="whatsappNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>WhatsApp Number</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <PhoneInput
+                              country={'mx'}
+                              value={`${field.value}`}
+                              onChange={field.onChange}
+                            />
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>

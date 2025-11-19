@@ -16,6 +16,7 @@ import axios from "axios";
 import { registerAffiliateRoutes } from "./routes/admin/affiliate-routes";
 import adminAiCredentialsRoutes from "./routes/admin-ai-credentials";
 import { parseDialog360Error, createErrorResponse } from "./services/channels/360dialog-errors";
+import { validatePhoneNumber } from "./utils/phone-validation";
 
 interface SMTPConfig {
   enabled: boolean;
@@ -401,7 +402,7 @@ function registerAdminRoutes(app: Express) {
 
   app.post("/api/admin/users", ensureSuperAdmin, async (req: Request, res: Response) => {
     try {
-      const { username, email, fullName, password, role, companyId, isSuperAdmin } = req.body;
+      const { username, email, fullName, password, role, companyId, isSuperAdmin, whatsappNumber } = req.body;
 
       if (!username || !email || !fullName || !password) {
         return res.status(400).json({ error: "Username, email, full name, and password are required" });
@@ -419,12 +420,20 @@ function registerAdminRoutes(app: Express) {
         }
       }
 
+      if(whatsappNumber){
+        const whatsappValidation = validatePhoneNumber(whatsappNumber);
+        if (!whatsappValidation.isValid) {
+          return res.status(400).json({ error: "Invalid WhatsApp number" });
+        }
+      }
+
       const hashedPassword = await hashPassword(password);
 
       const newUser = await storage.createUser({
         username,
         email,
         fullName,
+        whatsappNumber,
         password: hashedPassword,
         role: role || "agent",
         companyId: isSuperAdmin ? null : companyId,
@@ -443,7 +452,7 @@ function registerAdminRoutes(app: Express) {
   app.put("/api/admin/users/:id", ensureSuperAdmin, async (req: Request, res: Response) => {
     try {
       const userId = parseInt(req.params.id);
-      const { email, fullName, role, companyId, isSuperAdmin, active } = req.body;
+      const { email, fullName, role, companyId, isSuperAdmin, active, whatsappNumber } = req.body;
 
       const existingUser = await storage.getUser(userId);
       if (!existingUser) {
@@ -457,9 +466,17 @@ function registerAdminRoutes(app: Express) {
         }
       }
 
+      if(whatsappNumber){
+        const whatsappValidation = validatePhoneNumber(whatsappNumber);
+        if (!whatsappValidation.isValid) {
+          return res.status(400).json({ error: "Invalid WhatsApp number" });
+        }
+      }
+
       const updatedUser = await storage.updateUser(userId, {
         email,
         fullName,
+        whatsappNumber,
         role,
         companyId: isSuperAdmin ? null : companyId,
         isSuperAdmin: !!isSuperAdmin,

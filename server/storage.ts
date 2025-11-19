@@ -68,7 +68,16 @@ import {
   websiteAssets, type WebsiteAsset, type InsertWebsiteAsset,
 
   type DealStatus, type DealPriority,
-  type CompanySetting} from "@shared/db/schema";
+  type CompanySetting,
+  userGroups, type UserGroup, type InsertUserGroup,
+  assigns, type Assign, type InsertAssign,
+  InsertUserGroupMember,
+  UserGroupMember,
+  userGroupMembers,
+  AssignUser,
+  InsertAssignUser,
+  assignUsers,
+} from "@shared/db/schema";
 
 import session from "express-session";
 import { eq, and, desc, asc, or, sql, count, isNull, isNotNull, gt, gte, lt, lte, inArray, ne } from "drizzle-orm";
@@ -741,6 +750,7 @@ import { db } from "./db";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
 import { PgColumn } from "drizzle-orm/pg-core";
+import { logger } from "./utils/logger";
 
 const PostgresSessionStore = connectPg(session);
 
@@ -1728,11 +1738,6 @@ export class DatabaseStorage implements IStorage {
 
   async getChannelConnectionsByCompany(companyId: number): Promise<ChannelConnection[]> {
 
-
-    const allConnections = await db.select().from(channelConnections);
-    console.log(`[Storage] DEBUG - All channel connections in database:`,
-      allConnections.map(c => ({ id: c.id, name: c.accountName, status: c.status, companyId: c.companyId, userId: c.userId })));
-
     let result = await db.select().from(channelConnections).where(eq(channelConnections.companyId, companyId));
     console.log(`[Storage] Found ${result.length} connections with companyId=${companyId}:`,
       result.map(c => ({ id: c.id, name: c.accountName, status: c.status, companyId: c.companyId })));
@@ -1789,6 +1794,15 @@ export class DatabaseStorage implements IStorage {
     const [updatedConnection] = await db
       .update(channelConnections)
       .set({ status, updatedAt: new Date() })
+      .where(eq(channelConnections.id, id))
+      .returning();
+    return updatedConnection;
+  }
+
+  async updateChannelConnectionAssignId(id: number, assignId: number): Promise<ChannelConnection> {
+    const [updatedConnection] = await db
+      .update(channelConnections)
+      .set({ assignId, updatedAt: new Date() })
       .where(eq(channelConnections.id, id))
       .returning();
     return updatedConnection;
@@ -10406,6 +10420,118 @@ async updateRolePermissions(role: 'admin' | 'agent', permissions: Record<string,
       return contact;
     } catch (error) {
       console.error('Error unarchiving contact:', error);
+      throw error;
+    }
+  }
+
+  /* BEGIN OF USERGROUPS STORAGE */
+  async getDefaultUserGroup(companyId: number): Promise<UserGroup | null> {
+    try {
+      const [group] = await db
+        .select()
+        .from(userGroups)
+        .where(and(
+          eq(userGroups.companyId, companyId),
+          eq(userGroups.isDefault, true)
+        ));
+      return group || null;
+    } catch (error) {
+      logger.error('storage', 'Error getting default group:', error);
+      throw error;
+    } 
+  }
+
+  async createUserGroup(group: InsertUserGroup): Promise<UserGroup> {
+    try {
+      const [newGroup] = await db
+        .insert(userGroups)
+        .values(group)
+        .returning();
+      return newGroup;
+    } catch (error) {
+      logger.error('storage', 'Error creating user group:', error);
+      throw error;
+    }
+  }
+
+  async createUserGroupMember(member: InsertUserGroupMember): Promise<UserGroupMember> {
+    try {
+      const [newMember] = await db
+        .insert(userGroupMembers)
+        .values(member)
+        .returning();
+      return newMember;
+    } catch (error) {
+      logger.error('storage', 'Error creating user group member:', error);
+      throw error;
+    }
+  }
+
+  async getGroupMembersByGroupId( groupId: number ): Promise<UserGroupMember[]> {
+    try {
+      const members = await db
+        .select()
+        .from(userGroupMembers)
+        .where(eq(userGroupMembers.groupId, groupId));
+      return members || [];
+    } catch (error) {
+      logger.error('storage', 'Error getting group members:', error);
+      throw error;
+    }
+  }
+
+  /* BEGIN OF ASSIGNS STORAGE */
+  async getDefaultAssigns(companyId: number): Promise<Assign | null> {
+    try {
+      const [assign] = await db
+        .select()
+        .from(assigns)
+        .where(and(
+          eq(assigns.companyId, companyId),
+          eq(assigns.isDefault, true)
+        ));
+      return assign || null;
+    } catch (error) {
+      logger.error('storage', 'Error getting default assigns:', error);
+      throw error;
+    } 
+  }
+
+  async createAssign(assign: InsertAssign): Promise<Assign> {
+    try {
+      const [newAssign] = await db
+        .insert(assigns)
+        .values(assign)
+        .returning();
+      return newAssign;
+    } catch (error) {
+      logger.error('storage', 'Error creating assign:', error);
+      throw error;
+    }
+  }
+
+  async createAssignUser(member: InsertAssignUser): Promise<AssignUser> {
+    try {
+      const [newMember] = await db
+        .insert(assignUsers)
+        .values(member)
+        .returning();
+      return newMember;
+    } catch (error) {
+      logger.error('storage', 'Error creating assign member:', error);
+      throw error;
+    }
+  }
+
+  async getAssignedUsersByAssignId( assignId: number): Promise<AssignUser[]> {
+    try {
+      const assignedUsers = await db
+        .select()
+        .from(assignUsers)
+        .where(eq(assignUsers.assignId, assignId));
+      return assignedUsers || [];
+    } catch (error) {
+      logger.error('storage', 'Error getting assigns');
       throw error;
     }
   }

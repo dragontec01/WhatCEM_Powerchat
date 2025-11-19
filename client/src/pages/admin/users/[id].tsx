@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import PhoneInput from "react-phone-input-2";
+import 'react-phone-input-2/lib/style.css';
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -51,6 +53,7 @@ interface User {
   id: number;
   username: string;
   email: string;
+  whatsappNumber: string;
   fullName: string;
   role: string;
   companyId: number | null;
@@ -62,6 +65,7 @@ interface User {
 const userUpdateSchema = z.object({
   fullName: z.string().min(2, "Full name must be at least 2 characters"),
   email: z.string().email("Email must be a valid email address"),
+  whatsappNumber: z.string().optional(),
   role: z.enum(["admin", "agent", "user"]),
   companyId: z.number().optional(),
   isSuperAdmin: z.boolean().default(false),
@@ -145,6 +149,7 @@ export default function UserDetailPage() {
       form.reset({
         fullName: userData.fullName,
         email: userData.email,
+        whatsappNumber: userData.whatsappNumber || '',
         role: userData.role as any,
         companyId: userData.companyId || undefined,
         isSuperAdmin: userData.isSuperAdmin,
@@ -347,6 +352,26 @@ export default function UserDetailPage() {
                           <FormLabel>Email</FormLabel>
                           <FormControl>
                             <Input placeholder="user@example.com" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="whatsappNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>WhatsApp Number</FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <PhoneInput
+                                country={'mx'}
+                                value={`${field.value}`}
+                                onChange={field.onChange}
+                              />
+                            </div>
                           </FormControl>
                           <FormMessage />
                         </FormItem>
