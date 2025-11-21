@@ -4,7 +4,12 @@ import {
   Message,
   Contact,
   Conversation,
-  ChannelConnection} from '@shared/db/schema';
+  ChannelConnection,
+  Assign,
+  scheduleMilestone,
+  User,
+  userIndexSchedule,
+  users} from '@shared/db/schema';
 import whatsAppService from './channels/whatsapp';
 import instagramService from './channels/instagram';
 import messengerService from './channels/messenger';
@@ -28,6 +33,7 @@ import {
 import { EventEmitter } from 'events';
 import * as path from 'path';
 import { isWhatsAppGroupChatId } from '../utils/whatsapp-group-filter';
+import { logger } from '../utils/logger';
 
 dayjs.extend(utc);
 dayjs.extend(isBetween)
@@ -9224,6 +9230,10 @@ ${eventResult.eventLink ? `\nView event: ${eventResult.eventLink}` : ''}`;
     contact: Contact,
     channelConnection: ChannelConnection
   ): Promise<any> {
+
+    const assignUserRandomAvailable = await this.setUserByAssignment(channelConnection);
+    channelConnection = assignUserRandomAvailable.channelConnection
+
     const user = await storage.getUser(channelConnection.userId);
     if (!user?.companyId) {
       throw new Error('User must be associated with a company to create deals');
@@ -9234,8 +9244,6 @@ ${eventResult.eventLink ? `\nView event: ${eventResult.eventLink}` : ''}`;
     const existingActiveDeal = await storage.getActiveDealByContact(contact.id, user.companyId);
 
     if (existingActiveDeal) {
-
-
 
       const updates: any = {};
       let hasUpdates = false;
@@ -12480,12 +12488,75 @@ ${eventResult.eventLink ? `\nView event: ${eventResult.eventLink}` : ''}`;
 
   }
 
-  private async setUserByAssignment(channelConnection: ChannelConnection): Promise<ChannelConnection> {
-    const usersInAssign = await storage.getAssignedUsersWithAssignInfo(channelConnection.assignId as number);
-    if (usersInAssign.length > 0) {
-      const timeZone = usersInAssign[0]?.timeZone as number;
+  getScheduleIndexForCurrentTime(assign: Assign): number | null {
+    const currentHour = dayjs().utcOffset(assign.timeZone as number * 60);
+    // dayjs day(): Sunday = 0, Monday = 1, ..., Saturday = 6
+    const dayIndex = currentHour.day() === 0 ? 6 : currentHour.day() - 1; // 0 (Monday) to 6 (Sunday)
+    const schedulesIndex = (assign.schedule as scheduleMilestone[]).find(schedule => {
+      const startDate = dayjs().utcOffset(assign.timeZone as number * 60).hour(parseInt(schedule.scheduleStart.split(':')[0])).minute(parseInt(schedule.scheduleStart.split(':')[1])).second(0);
+      const endDate = dayjs().utcOffset(assign.timeZone as number * 60).hour(parseInt(schedule.scheduleEnd.split(':')[0])).minute(parseInt(schedule.scheduleEnd.split(':')[1])).second(59);
+      return currentHour.isBetween(startDate, endDate) && schedule.dayOfWeek === dayIndex;
+    });
+    return schedulesIndex?.scheduleIndex || null;
+  }
+
+  private async setUserByAssignment(channelConnection: ChannelConnection): Promise<{channelConnection: ChannelConnection; user: {
+      assignUsersId: number;
+      assignId: number;
+      userId: number;
+      schedules: userIndexSchedule[] | unknown;
+      companyId: number | null;
+      whatsappNumber: string | null;
+    } | null}> {
+    const assignConfig = await storage.getAssignById(channelConnection.assignId as number);
+    const scheduleIndex = this.getScheduleIndexForCurrentTime(assignConfig as Assign);
+    if (scheduleIndex === null) {
+      return {channelConnection, user: null};
     }
-    return channelConnection;
+    const usersInAssign = await storage.getAssignedUsersWithUserInfo(channelConnection.assignId as number);
+    let usersFiltered = usersInAssign.filter(user => (user.schedules as userIndexSchedule[]).some(schedule => schedule.index === scheduleIndex && !schedule.assigned));
+    
+    if(!usersFiltered.length) {
+      for(const userAssign of usersInAssign){
+        const userIndexSchedule = (userAssign.schedules as userIndexSchedule[]).findIndex(schedule => schedule.index === scheduleIndex);
+        if(userIndexSchedule !== -1) {
+          (userAssign.schedules as userIndexSchedule[])[userIndexSchedule] = {...(userAssign.schedules as userIndexSchedule[])[userIndexSchedule], assigned: false}
+          try {
+            await storage.updateAssignUserSchedules(
+              userAssign.userId,
+              userAssign.assignId,
+              userAssign.schedules as userIndexSchedule[]
+            );
+            logger.info('flowExecutor', `Schedules updated for user ${userAssign.userId} in assignation ${userAssign.assignId}`);
+          } catch(error) {
+            logger.error('flowExecutor', `Could not update assign for user ${userAssign.userId} in assignation ${userAssign.assignId}`);
+          }
+
+          usersFiltered.push(userAssign)
+        }
+      }
+    }
+
+    if(!usersFiltered.length) {
+      logger.warn('flowExecutor', `None user found in assignation ${channelConnection.assignId} in this schedule`);
+      return {channelConnection, user: null}
+    }
+
+    // Select randomly a user from the ones filtered
+    const userAssigned = usersFiltered[Math.floor( Math.random() * usersFiltered.length )]
+    const userIndexSchedule = (userAssigned.schedules as userIndexSchedule[]).findIndex(schedule => schedule.index === scheduleIndex);
+    (userAssigned.schedules as userIndexSchedule[])[userIndexSchedule] = {...(userAssigned.schedules as userIndexSchedule[])[userIndexSchedule], assigned: true};
+    try {
+      await storage.updateAssignUserSchedules(
+        userAssigned.userId,
+        userAssigned.assignId,
+        userAssigned.schedules as userIndexSchedule[]
+      ) 
+    } catch(error) {
+      logger.error('flowExecutor', `Could not find user index schedule for user ${userAssigned.userId} in assignation ${userAssigned.assignId}`);
+    }
+    channelConnection.userId = userAssigned.userId
+    return {channelConnection, user: userAssigned};
   }
 
 }

@@ -77,6 +77,7 @@ import {
   AssignUser,
   InsertAssignUser,
   assignUsers,
+  userIndexSchedule,
 } from "@shared/db/schema";
 
 import session from "express-session";
@@ -10497,6 +10498,19 @@ async updateRolePermissions(role: 'admin' | 'agent', permissions: Record<string,
     } 
   }
 
+  async getAssignById(assignId: number): Promise<Assign | null> {
+    try {
+      const [assign] = await db
+        .select()
+        .from(assigns)
+        .where(eq(assigns.id, assignId));
+      return assign || null;
+    } catch (error) {
+      logger.error('storage', 'Error getting assign by id:', error);
+      throw error;
+    }
+  }
+
   async createAssign(assign: InsertAssign): Promise<Assign> {
     try {
       const [newAssign] = await db
@@ -10523,6 +10537,29 @@ async updateRolePermissions(role: 'admin' | 'agent', permissions: Record<string,
     }
   }
 
+  async updateAssignUserSchedules(userId: number, assignId: number, schedules: userIndexSchedule[]) {
+    try {
+      const sanitizedSchedules = Array.isArray(schedules) ? schedules : [];
+
+        const [updated] = await db
+          .update(assignUsers)
+          .set({
+            indexSchedules: sanitizedSchedules,
+            updatedAt: new Date()
+          })
+          .where(and(
+            eq(assignUsers.id, userId),
+            eq(assignUsers.assignId, assignId)
+          ))
+          .returning();
+
+        return updated;
+    } catch (error) {
+      logger.error('storage', 'Error updating assign user schedules:', error);
+      throw error;
+    }
+  }
+
   async getAssignedUsersByAssignId( assignId: number): Promise<AssignUser[]> {
     try {
       const assignedUsers = await db
@@ -10536,14 +10573,13 @@ async updateRolePermissions(role: 'admin' | 'agent', permissions: Record<string,
     }
   }
 
-  async getAssignedUsersWithAssignInfo( assignId: number): Promise<Array<{
+  async getAssignedUsersWithUserInfo( assignId: number): Promise<Array<{
     assignUsersId: number;
     assignId: number;
     userId: number;
+    schedules: userIndexSchedule[] | unknown;
     companyId: number | null;
-    assignName: string | null;
-    isDefaultAssign: boolean | null;
-    timeZone: number | null;
+    whatsappNumber: string | null;
   } >> {
     try {
       const assignedUsers = await db
@@ -10551,14 +10587,13 @@ async updateRolePermissions(role: 'admin' | 'agent', permissions: Record<string,
           assignUsersId: assignUsers.id,
           assignId: assignUsers.assignId,
           userId: assignUsers.userId,
+          schedules: assignUsers.indexSchedules,
 
-          companyId: assigns.companyId,
-          assignName: assigns.assignName,
-          isDefaultAssign: assigns.isDefault,
-          timeZone: assigns.timeZone
+          companyId: users.companyId,
+          whatsappNumber: users.whatsappNumber
         })
         .from(assignUsers)
-        .innerJoin(assigns, eq(assignUsers.assignId, assigns.id))
+        .innerJoin(users, eq(assignUsers.userId, users.id))
         .where(eq(assignUsers.assignId, assignId));
 
       return assignedUsers || [];

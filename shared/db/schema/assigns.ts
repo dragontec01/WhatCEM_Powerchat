@@ -65,6 +65,11 @@ export interface scheduleMilestone {
   textColor: string;
 }
 
+export interface userIndexSchedule {
+  index: number;
+  assigned: boolean;
+}
+
 export const assigns = pgTable("assigns", {
   id: serial("id").primaryKey(),
   assignName: text("assign_name"),
