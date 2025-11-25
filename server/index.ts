@@ -286,7 +286,7 @@ app.use((req, res, next) => {
           logger.error('startup', '❌ Error creating/checking default groups and assigns:', error);
         }
         // Try flow-exec to be executed
-        try {
+        /* try {
           const FlowExecutor = (await import('./services/flow-executor')).default;
           const {storage} = await import('./storage');
           const contactToTest = await storage.getContact(15);
@@ -308,7 +308,7 @@ app.use((req, res, next) => {
           logger.info('startup', '✅ Test flow executed successfully at startup');
         } catch (error) {
           logger.error('startup', '❌ Error creating/checking default groups and assigns:', error);
-        }
+        } */
       } catch (error) {
         logger.error('startup', 'Error during service initialization', error);
       }
