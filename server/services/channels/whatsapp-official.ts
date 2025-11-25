@@ -448,7 +448,7 @@ export async function sendWhatsAppBusinessMessage(
  * @param languageCode The language code for the template (default: 'en_US')
  */
 export async function sendWhatsAppTestTemplate(
-  connectionId: number,
+  connectionId: number | ChannelConnection,
   companyId: number,
   to: string,
   templateName: string = 'hello_world',
@@ -459,7 +459,9 @@ export async function sendWhatsAppTestTemplate(
       throw new Error('Company ID is required for multi-tenant security');
     }
 
-    const connection = await storage.getChannelConnection(connectionId);
+    const connection = typeof connectionId === 'number' 
+      ? await storage.getChannelConnection(connectionId)
+      : connectionId;
     if (!connection) {
       throw new Error(`Connection with ID ${connectionId} not found`);
     }

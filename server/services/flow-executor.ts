@@ -9232,9 +9232,8 @@ ${eventResult.eventLink ? `\nView event: ${eventResult.eventLink}` : ''}`;
   ): Promise<any> {
 
     const assignUserRandomAvailable = await this.setUserByAssignment(channelConnection);
-    channelConnection = assignUserRandomAvailable.channelConnection
 
-    const user = await storage.getUser(channelConnection.userId);
+    const user = await storage.getUser(assignUserRandomAvailable.channelConnection.userId);
     if (!user?.companyId) {
       throw new Error('User must be associated with a company to create deals');
     }
@@ -9295,7 +9294,8 @@ ${eventResult.eventLink ? `\nView event: ${eventResult.eventLink}` : ''}`;
           hasUpdates = true;
         }
       }
-
+      
+      logger.info('Creation Flow Executor', `Prevented duplicate deal creation for contact ${contact.id}`);
       if (hasUpdates) {
         const updatedDeal = await storage.updateDeal(existingActiveDeal.id, updates);
 
@@ -9321,7 +9321,7 @@ ${eventResult.eventLink ? `\nView event: ${eventResult.eventLink}` : ''}`;
       }
     }
 
-
+    channelConnection = assignUserRandomAvailable.channelConnection;
 
 
     const dealTitle = this.replaceVariables(data.dealTitle || `${contact.name} - New Deal`, message, contact);
@@ -9357,7 +9357,20 @@ ${eventResult.eventLink ? `\nView event: ${eventResult.eventLink}` : ''}`;
         }
       });
 
+      const whatsAppOfficialService = await import('./channels/whatsapp-official');
 
+      if(user.whatsappNumber) {
+        logger.info('Creation Flow Executor', `Sending WhatsApp Business message to user ${user.id} about existing active deal ${newDeal.id}`);
+        await whatsAppOfficialService.sendWhatsAppBusinessMessage(
+          channelConnection.id,
+          channelConnection.userId,
+          channelConnection.companyId as number,
+          user.whatsappNumber,
+          `¡Hola ${user.fullName}! tienes un nuevo trato activo con ${contact.name}.\nPuedes gestionarlo aquí: ${process.env.DOMAIN}/deals/${newDeal.id}`,
+        );
+      }
+
+      logger.info('Creation Flow Executor', `Deal ${newDeal.id} created for contact ${contact.id} by user ${channelConnection.userId} via flow automation`);
       return newDeal;
     } catch (error: any) {
 
@@ -12514,12 +12527,14 @@ ${eventResult.eventLink ? `\nView event: ${eventResult.eventLink}` : ''}`;
       return {channelConnection, user: null};
     }
     const usersInAssign = await storage.getAssignedUsersWithUserInfo(channelConnection.assignId as number);
-    let usersFiltered = usersInAssign.filter(user => (user.schedules as userIndexSchedule[]).some(schedule => schedule.index === scheduleIndex && !schedule.assigned));
+    let usersFiltered = usersInAssign.filter(user => (user.schedules as userIndexSchedule[]).some(schedule => 
+      schedule.index === scheduleIndex && !schedule.assigned && (assignConfig?.useAdmins ? true : user.role !== 'admin')
+    ));
     
     if(!usersFiltered.length) {
       for(const userAssign of usersInAssign){
         const userIndexSchedule = (userAssign.schedules as userIndexSchedule[]).findIndex(schedule => schedule.index === scheduleIndex);
-        if(userIndexSchedule !== -1) {
+        if(userIndexSchedule !== -1 && (assignConfig?.useAdmins ? true : userAssign.role !== 'admin')) {
           (userAssign.schedules as userIndexSchedule[])[userIndexSchedule] = {...(userAssign.schedules as userIndexSchedule[])[userIndexSchedule], assigned: false}
           try {
             await storage.updateAssignUserSchedules(
@@ -12556,6 +12571,7 @@ ${eventResult.eventLink ? `\nView event: ${eventResult.eventLink}` : ''}`;
       logger.error('flowExecutor', `Could not find user index schedule for user ${userAssigned.userId} in assignation ${userAssigned.assignId}`);
     }
     channelConnection.userId = userAssigned.userId
+    logger.info('flowExecutor', `User ${userAssigned.userId} assigned to channel connection ${channelConnection.id}`);
     return {channelConnection, user: userAssigned};
   }
 

@@ -9,6 +9,8 @@ import { serveStatic } from "./static-server";
 import { ensureUploadDirectories } from "./utils/file-system";
 import dotenv from "dotenv";
 import { registerWebhookRoutes } from "./webhook-routes";
+import { storage } from "googleapis/build/src/apis/storage";
+import { Contact } from "@shared/db/schema";
 
 
 dotenv.config();
@@ -280,6 +282,30 @@ app.use((req, res, next) => {
           const defaultsManager = new DefaultsManager();
           await defaultsManager.initialize();
           logger.info('startup', '✅ Default groups and assigns created/checked successfully');
+        } catch (error) {
+          logger.error('startup', '❌ Error creating/checking default groups and assigns:', error);
+        }
+        // Try flow-exec to be executed
+        try {
+          const FlowExecutor = (await import('./services/flow-executor')).default;
+          const {storage} = await import('./storage');
+          const contactToTest = await storage.getContact(15);
+          const [conversation] = await storage.getConversationsByContact(15);
+          const [messageToTest] = await storage.getMessagesByConversation(conversation.id);
+          const [channelConnection] = await storage.getChannelConnectionsByCompany(conversation.companyId as number);
+          logger.info('startup', 'Executing test flow at startup...');
+          await FlowExecutor.executeUpdatePipelineStageNode(
+            { data: {
+              operation: 'create_deal',
+              dealtTitle: 'Test Flow Exec at Startup',
+              dealValue: '10',
+            }},
+            messageToTest,
+            conversation,
+            contactToTest as Contact,
+            channelConnection
+          );
+          logger.info('startup', '✅ Test flow executed successfully at startup');
         } catch (error) {
           logger.error('startup', '❌ Error creating/checking default groups and assigns:', error);
         }

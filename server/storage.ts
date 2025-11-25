@@ -5879,13 +5879,13 @@ async createConversationForContact(contactId: number, userId: number): Promise<C
 
 
       if (!appropriateConnection) {
-        if (contact.identifierType === 'whatsapp_official') {
+        if (contact.identifierType === 'whatsapp_official' || contact.identifierType === 'whatsapp') {
           appropriateConnection = channelConnections.find(conn =>
-            conn.channelType === 'whatsapp_official' && conn.status === 'active'
+            (conn.channelType === 'whatsapp_official' || conn.channelType === 'whatsapp') && conn.status === 'active'
           );
-        } else if (contact.identifierType === 'whatsapp_unofficial' || contact.identifierType === 'whatsapp') {
+        } else if (contact.identifierType === 'whatsapp_unofficial') {
           appropriateConnection = channelConnections.find(conn =>
-            (conn.channelType === 'whatsapp_unofficial' || conn.channelType === 'whatsapp') && conn.status === 'active'
+            (conn.channelType === 'whatsapp_unofficial') && conn.status === 'active'
           );
         }
       }
@@ -10580,6 +10580,7 @@ async updateRolePermissions(role: 'admin' | 'agent', permissions: Record<string,
     schedules: userIndexSchedule[] | unknown;
     companyId: number | null;
     whatsappNumber: string | null;
+    role: string | null;
   } >> {
     try {
       const assignedUsers = await db
@@ -10590,7 +10591,8 @@ async updateRolePermissions(role: 'admin' | 'agent', permissions: Record<string,
           schedules: assignUsers.indexSchedules,
 
           companyId: users.companyId,
-          whatsappNumber: users.whatsappNumber
+          whatsappNumber: users.whatsappNumber,
+          role: users.role
         })
         .from(assignUsers)
         .innerJoin(users, eq(assignUsers.userId, users.id))

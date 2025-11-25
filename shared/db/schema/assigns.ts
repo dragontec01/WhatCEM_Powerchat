@@ -16,6 +16,19 @@ export const channelTypes = z.enum([
   "tiktok"
 ]);
 
+export interface ChannelConnectionData {
+    appId:             string;
+    wabaId:            string;
+    appSecret:         string;
+    webhookUrl:        string;
+    accessToken:       string;
+    verifyToken:       string;
+    phoneNumberId:     string;
+    businessAccountId: string;
+    waba_id?:         string;
+    access_token?:    string;
+}
+
 export const channelConnections = pgTable("channel_connections", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
