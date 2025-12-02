@@ -106,6 +106,13 @@ jobs:
             cd /www/wwwroot/whatcem.com/instances/whatcem
             chmod +x manage.sh
             
+            # Backup docker logs
+            echo "📦 Backing up docker logs..."
+            if [ -d "logs" ]; then
+              timestamp=$(date +%Y%m%d_%H%M%S)
+              mv logs "~/logs_bckps/logs.backup.$timestamp" || true
+            fi
+
             # Stop the application
             echo "⏸️  Stopping application..."
             cd /www/wwwroot/whatcem.com/instances/whatcem
@@ -117,7 +124,7 @@ jobs:
             # Clean install of production dependencies
             echo "📦 Installing production dependencies..."
             cd /www/wwwroot/whatcem.com
-            
+
             # Install dependencies with npm ci (clean install)
             npm ci --omit=dev --no-audit --no-fund
 
