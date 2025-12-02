@@ -38,31 +38,48 @@ jobs:
           # Create a tarball containing dist and package files
           tar -czf dist.tar.gz dist/ package.json package-lock.json
       
-      - name: Setup SSH with passphrase
-        env:
-          SSH_AUTH_SOCK: /tmp/ssh_agent.sock
-        run: |
-          # Start ssh-agent
-          ssh-agent -a $SSH_AUTH_SOCK > /dev/null
-          
-          # Add the private key to ssh-agent with passphrase
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" | tr -d '\r' | SSH_ASKPASS_REQUIRE=never ssh-add - <<< "${{ secrets.SSH_KEY_PHRASE }}"
-          
-          # Add server to known hosts
-          mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+      - name: Test SSH connection
+        uses: appleboy/ssh-action@v1.2.4
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          passphrase: ${{ secrets.SSH_KEY_PHRASE }}
+          port: 22
+          timeout: 30s
+          debug: true
+          script: |
+            echo "✅ SSH connection successful!"
+            echo "Server: $(hostname)"
+            echo "User: $(whoami)"
+            echo "Date: $(date)"
+      
+      - name: Upload deployment archive to server
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          passphrase: ${{ secrets.SSH_KEY_PHRASE }}
+          port: 22
+          timeout: 60s
+          command_timeout: 10m
+          source: "dist.tar.gz"
+          target: "/tmp/"
+          debug: true
       
       - name: Deploy to server
-        env:
-          SSH_AUTH_SOCK: /tmp/ssh_agent.sock
-        run: |
-          # Upload the dist archive (ssh-agent will handle authentication)
-          scp -o StrictHostKeyChecking=no \
-            dist.tar.gz ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/tmp/
-          
-          # Connect to server and execute deployment commands
-          ssh -o StrictHostKeyChecking=no \
-            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'ENDSSH'
+        uses: appleboy/ssh-action@v1.2.4
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          passphrase: ${{ secrets.SSH_KEY_PHRASE }}
+          port: 22
+          timeout: 60s
+          command_timeout: 30m
+          debug: true
+          script: |
             set -e
             
             echo "🚀 Starting deployment process..."
@@ -74,7 +91,7 @@ jobs:
             echo "📦 Backing up current dist folder..."
             if [ -d "dist" ]; then
               timestamp=$(date +%Y%m%d_%H%M%S)
-              mv dist "dist.backup.$timestamp" || true
+              mv dist "~/dist_bckps/dist.backup.$timestamp" || true
             fi
             
             # Extract new dist folder
@@ -84,6 +101,18 @@ jobs:
             # Clean up temp file
             rm /tmp/dist.tar.gz
             
+            # Fix permissions for manage.sh if needed
+            echo "🔒 Ensuring manage.sh has execute permissions..."
+            cd /www/wwwroot/whatcem.com/instances/whatcem
+            chmod +x manage.sh
+            
+            # Backup docker logs
+            echo "📦 Backing up docker logs..."
+            if [ -d "logs" ]; then
+              timestamp=$(date +%Y%m%d_%H%M%S)
+              mv logs "~/logs_bckps/logs.backup.$timestamp" || true
+            fi
+
             # Stop the application
             echo "⏸️  Stopping application..."
             cd /www/wwwroot/whatcem.com/instances/whatcem
@@ -92,14 +121,19 @@ jobs:
             # Wait a moment for clean shutdown
             sleep 3
 
-            # Update node packages
-            npm install --production --no-audit --no-fund
+            # Clean install of production dependencies
+            echo "📦 Installing production dependencies..."
+            cd /www/wwwroot/whatcem.com
+
+            # Install dependencies with npm ci (clean install)
+            npm ci --omit=dev --no-audit --no-fund
 
             # Wait a moment for clean install
             sleep 3
             
             # Start the application
             echo "▶️  Starting application..."
+            cd /www/wwwroot/whatcem.com/instances/whatcem
             ./manage.sh start
             
             # Wait for startup
@@ -109,16 +143,12 @@ jobs:
             
             # Show status
             echo "📊 Application status:"
-            ./manage.sh status || true
-          ENDSSH
-      
+            cd /www/wwwroot/whatcem.com/instances/whatcem
+            ./manage.sh status
+        
       - name: Cleanup
         if: always()
-        env:
-          SSH_AUTH_SOCK: /tmp/ssh_agent.sock
         run: |
-          # Kill ssh-agent
-          ssh-agent -k || true
           rm -f dist.tar.gz
       
       - name: Deployment summary
