@@ -39,7 +39,7 @@ jobs:
           tar -czf dist.tar.gz dist/ package.json package-lock.json
       
       - name: Upload deployment archive to server
-        uses: appleboy/scp-action@v1.2.4
+        uses: appleboy/scp-action@v1.0.0
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
