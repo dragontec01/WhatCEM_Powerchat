@@ -101,6 +101,11 @@ jobs:
             # Clean up temp file
             rm /tmp/dist.tar.gz
             
+            # Fix permissions for manage.sh if needed
+            echo "🔒 Ensuring manage.sh has execute permissions..."
+            cd /www/wwwroot/whatcem.com/instances/whatcem
+            chmod +x manage.sh
+            
             # Stop the application
             echo "⏸️  Stopping application..."
             cd /www/wwwroot/whatcem.com/instances/whatcem
@@ -110,6 +115,8 @@ jobs:
             sleep 3
 
             # Update node packages
+            echo "📦 Installing production dependencies..."
+            cd /www/wwwroot/whatcem.com
             npm install --production --no-audit --no-fund
 
             # Wait a moment for clean install
@@ -117,6 +124,7 @@ jobs:
             
             # Start the application
             echo "▶️  Starting application..."
+            cd /www/wwwroot/whatcem.com/instances/whatcem
             ./manage.sh start
             
             # Wait for startup
@@ -126,10 +134,8 @@ jobs:
             
             # Show status
             echo "📊 Application status:"
-            ./manage.sh status || true
-
-            # Delete temp dist.tar.gz
-            rm -f /tmp/dist.tar.gz
+            cd /www/wwwroot/whatcem.com/instances/whatcem
+            ./manage.sh status
         
       - name: Cleanup
         if: always()
