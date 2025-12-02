@@ -91,7 +91,7 @@ jobs:
             echo "📦 Backing up current dist folder..."
             if [ -d "dist" ]; then
               timestamp=$(date +%Y%m%d_%H%M%S)
-              mv dist "dist.backup.$timestamp" || true
+              mv dist "~/dist_bckps/dist.backup.$timestamp" || true
             fi
             
             # Extract new dist folder
@@ -114,10 +114,12 @@ jobs:
             # Wait a moment for clean shutdown
             sleep 3
 
-            # Update node packages
+            # Clean install of production dependencies
             echo "📦 Installing production dependencies..."
             cd /www/wwwroot/whatcem.com
-            npm install --production --no-audit --no-fund
+            
+            # Install dependencies with npm ci (clean install)
+            npm ci --omit=dev --no-audit --no-fund
 
             # Wait a moment for clean install
             sleep 3
