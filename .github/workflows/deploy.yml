@@ -108,10 +108,7 @@ jobs:
             
             # Backup docker logs
             echo "📦 Backing up docker logs..."
-            if [ -d "logs" ]; then
-              timestamp=$(date +%Y%m%d_%H%M%S)
-              mv logs "~/logs_bckps/logs.backup.$timestamp" || true
-            fi
+            docker logs docker logs powerchat-app-whatcem > ~/logs_bckps/powerchat-app-whatcem_logs_$timestamp.log || true
 
             # Stop the application
             echo "⏸️  Stopping application..."
