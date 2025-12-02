@@ -1,0 +1,131 @@
+name: Build and Deploy to Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to deploy'
+        required: true
+        default: 'main'
+        type: string
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build project
+        run: npm run build
+        env:
+          NODE_ENV: production
+      
+      - name: Create deployment archive
+        run: |
+          # Create a tarball containing dist and package files
+          tar -czf dist.tar.gz dist/ package.json package-lock.json
+      
+      - name: Setup SSH with passphrase
+        env:
+          SSH_AUTH_SOCK: /tmp/ssh_agent.sock
+        run: |
+          # Start ssh-agent
+          ssh-agent -a $SSH_AUTH_SOCK > /dev/null
+          
+          # Add the private key to ssh-agent with passphrase
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" | tr -d '\r' | SSH_ASKPASS_REQUIRE=never ssh-add - <<< "${{ secrets.SSH_KEY_PHRASE }}"
+          
+          # Add server to known hosts
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+      
+      - name: Deploy to server
+        env:
+          SSH_AUTH_SOCK: /tmp/ssh_agent.sock
+        run: |
+          # Upload the dist archive (ssh-agent will handle authentication)
+          scp -o StrictHostKeyChecking=no \
+            dist.tar.gz ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/tmp/
+          
+          # Connect to server and execute deployment commands
+          ssh -o StrictHostKeyChecking=no \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'ENDSSH'
+            set -e
+            
+            echo "🚀 Starting deployment process..."
+            
+            # Navigate to deployment directory
+            cd /www/wwwroot/whatcem.com
+            
+            # Backup current dist folder
+            echo "📦 Backing up current dist folder..."
+            if [ -d "dist" ]; then
+              timestamp=$(date +%Y%m%d_%H%M%S)
+              mv dist "dist.backup.$timestamp" || true
+            fi
+            
+            # Extract new dist folder
+            echo "📂 Extracting new build..."
+            tar -xzf /tmp/dist.tar.gz -C /www/wwwroot/whatcem.com/
+            
+            # Clean up temp file
+            rm /tmp/dist.tar.gz
+            
+            # Stop the application
+            echo "⏸️  Stopping application..."
+            cd /www/wwwroot/whatcem.com/instances/whatcem
+            ./manage.sh stop
+            
+            # Wait a moment for clean shutdown
+            sleep 3
+
+            # Update node packages
+            npm install --production --no-audit --no-fund
+
+            # Wait a moment for clean install
+            sleep 3
+            
+            # Start the application
+            echo "▶️  Starting application..."
+            ./manage.sh start
+            
+            # Wait for startup
+            sleep 5
+            
+            echo "✅ Deployment completed successfully!"
+            
+            # Show status
+            echo "📊 Application status:"
+            ./manage.sh status || true
+          ENDSSH
+      
+      - name: Cleanup
+        if: always()
+        env:
+          SSH_AUTH_SOCK: /tmp/ssh_agent.sock
+        run: |
+          # Kill ssh-agent
+          ssh-agent -k || true
+          rm -f dist.tar.gz
+      
+      - name: Deployment summary
+        run: |
+          echo "### Deployment Summary 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch:** ${{ inputs.branch }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Server:** ${{ secrets.SSH_HOST }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Deployment Time:** $(date)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** ✅ Success" >> $GITHUB_STEP_SUMMARY

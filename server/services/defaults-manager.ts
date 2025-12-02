@@ -105,9 +105,10 @@ export class DefaultsManager {
                 assignId: (this.defaultAssign as Assign).id,
                 indexSchedules: ((this.defaultAssign as Assign).schedule as scheduleMilestone[]).map((milestone: scheduleMilestone) => ({
                     index: milestone.scheduleIndex,
-                    assigned: true
+                    assigned: false
                 }))
             })));
+            logger.info('assign-default-schedules-to-all-users', `Assigned default schedules to all users for assign ${(this.defaultAssign as Assign).id}`);
         } catch (error) {
             logger.error('assign-default-schedules-to-all-users', 'Error assigning default schedules to all users:', error);
             throw error;

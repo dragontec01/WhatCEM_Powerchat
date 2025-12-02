@@ -1,4 +1,5 @@
 node_modules
+Dockerfile.simple
 dist
 .DS_Store
 uploads
@@ -8,6 +9,8 @@ vite.config.ts.*
 *.tar.gz
 *.zip
 backups/
+instances/
+start.js
 /.idea/AugmentWebviewStateStore.xml
 /.idea/misc.xml
 /.idea/modules.xml

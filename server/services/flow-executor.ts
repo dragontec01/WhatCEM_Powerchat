@@ -4,7 +4,12 @@ import {
   Message,
   Contact,
   Conversation,
-  ChannelConnection} from '@shared/db/schema';
+  ChannelConnection,
+  Assign,
+  scheduleMilestone,
+  User,
+  userIndexSchedule,
+  users} from '@shared/db/schema';
 import whatsAppService from './channels/whatsapp';
 import instagramService from './channels/instagram';
 import messengerService from './channels/messenger';
@@ -13,6 +18,10 @@ import googleCalendarService from './google-calendar';
 import googleSheetsService from './google-sheets';
 import { dataCaptureService } from './data-capture-service';
 import axios from 'axios';
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import isBetween from "dayjs/plugin/isBetween";
+
 import { FlowExecutionManager } from './flow-execution-manager';
 import { FlowExecutionContext } from './flow-execution-context';
 import {
@@ -24,6 +33,10 @@ import {
 import { EventEmitter } from 'events';
 import * as path from 'path';
 import { isWhatsAppGroupChatId } from '../utils/whatsapp-group-filter';
+import { logger } from '../utils/logger';
+
+dayjs.extend(utc);
+dayjs.extend(isBetween)
 
 interface Flow {
   id: number;
@@ -9217,7 +9230,10 @@ ${eventResult.eventLink ? `\nView event: ${eventResult.eventLink}` : ''}`;
     contact: Contact,
     channelConnection: ChannelConnection
   ): Promise<any> {
-    const user = await storage.getUser(channelConnection.userId);
+
+    const assignUserRandomAvailable = await this.setUserByAssignment(channelConnection);
+
+    const user = await storage.getUser(assignUserRandomAvailable.channelConnection.userId);
     if (!user?.companyId) {
       throw new Error('User must be associated with a company to create deals');
     }
@@ -9227,8 +9243,6 @@ ${eventResult.eventLink ? `\nView event: ${eventResult.eventLink}` : ''}`;
     const existingActiveDeal = await storage.getActiveDealByContact(contact.id, user.companyId);
 
     if (existingActiveDeal) {
-
-
 
       const updates: any = {};
       let hasUpdates = false;
@@ -9280,7 +9294,8 @@ ${eventResult.eventLink ? `\nView event: ${eventResult.eventLink}` : ''}`;
           hasUpdates = true;
         }
       }
-
+      
+      logger.info('Creation Flow Executor', `Prevented duplicate deal creation for contact ${contact.id}`);
       if (hasUpdates) {
         const updatedDeal = await storage.updateDeal(existingActiveDeal.id, updates);
 
@@ -9306,7 +9321,7 @@ ${eventResult.eventLink ? `\nView event: ${eventResult.eventLink}` : ''}`;
       }
     }
 
-
+    channelConnection = assignUserRandomAvailable.channelConnection;
 
 
     const dealTitle = this.replaceVariables(data.dealTitle || `${contact.name} - New Deal`, message, contact);
@@ -9342,7 +9357,20 @@ ${eventResult.eventLink ? `\nView event: ${eventResult.eventLink}` : ''}`;
         }
       });
 
+      const whatsAppOfficialService = await import('./channels/whatsapp-official');
 
+      if(user.whatsappNumber) {
+        logger.info('Creation Flow Executor', `Sending WhatsApp Business message to user ${user.id} about existing active deal ${newDeal.id}`);
+        await whatsAppOfficialService.sendWhatsAppBusinessMessage(
+          channelConnection.id,
+          channelConnection.userId,
+          channelConnection.companyId as number,
+          user.whatsappNumber,
+          `¡Hola ${user.fullName}! tienes un nuevo trato activo con ${contact.name}.\nPuedes gestionarlo aquí: ${process.env.DOMAIN}/deals/${newDeal.id}`,
+        );
+      }
+
+      logger.info('Creation Flow Executor', `Deal ${newDeal.id} created for contact ${contact.id} by user ${channelConnection.userId} via flow automation`);
       return newDeal;
     } catch (error: any) {
 
@@ -12470,7 +12498,83 @@ ${eventResult.eventLink ? `\nView event: ${eventResult.eventLink}` : ''}`;
       console.error('Error sending WhatsApp interactive message:', error);
       throw error;
     }
+
   }
+
+  getScheduleIndexForCurrentTime(assign: Assign): number | null {
+    const currentHour = dayjs().utcOffset(assign.timeZone as number * 60);
+    // dayjs day(): Sunday = 0, Monday = 1, ..., Saturday = 6
+    const dayIndex = currentHour.day() === 0 ? 6 : currentHour.day() - 1; // 0 (Monday) to 6 (Sunday)
+    const schedulesIndex = (assign.schedule as scheduleMilestone[]).find(schedule => {
+      const startDate = dayjs().utcOffset(assign.timeZone as number * 60).hour(parseInt(schedule.scheduleStart.split(':')[0])).minute(parseInt(schedule.scheduleStart.split(':')[1])).second(0);
+      const endDate = dayjs().utcOffset(assign.timeZone as number * 60).hour(parseInt(schedule.scheduleEnd.split(':')[0])).minute(parseInt(schedule.scheduleEnd.split(':')[1])).second(59);
+      return currentHour.isBetween(startDate, endDate) && schedule.dayOfWeek === dayIndex;
+    });
+    return schedulesIndex?.scheduleIndex || null;
+  }
+
+  private async setUserByAssignment(channelConnection: ChannelConnection): Promise<{channelConnection: ChannelConnection; user: {
+      assignUsersId: number;
+      assignId: number;
+      userId: number;
+      schedules: userIndexSchedule[] | unknown;
+      companyId: number | null;
+      whatsappNumber: string | null;
+    } | null}> {
+    const assignConfig = await storage.getAssignById(channelConnection.assignId as number);
+    const scheduleIndex = this.getScheduleIndexForCurrentTime(assignConfig as Assign);
+    if (scheduleIndex === null) {
+      return {channelConnection, user: null};
+    }
+    const usersInAssign = await storage.getAssignedUsersWithUserInfo(channelConnection.assignId as number);
+    let usersFiltered = usersInAssign.filter(user => (user.schedules as userIndexSchedule[]).some(schedule => 
+      schedule.index === scheduleIndex && !schedule.assigned && (assignConfig?.useAdmins ? true : user.role !== 'admin')
+    ));
+    
+    if(!usersFiltered.length) {
+      for(const userAssign of usersInAssign){
+        const userIndexSchedule = (userAssign.schedules as userIndexSchedule[]).findIndex(schedule => schedule.index === scheduleIndex);
+        if(userIndexSchedule !== -1 && (assignConfig?.useAdmins ? true : userAssign.role !== 'admin')) {
+          (userAssign.schedules as userIndexSchedule[])[userIndexSchedule] = {...(userAssign.schedules as userIndexSchedule[])[userIndexSchedule], assigned: false}
+          try {
+            await storage.updateAssignUserSchedules(
+              userAssign.userId,
+              userAssign.assignId,
+              userAssign.schedules as userIndexSchedule[]
+            );
+            logger.info('flowExecutor', `Schedules updated for user ${userAssign.userId} in assignation ${userAssign.assignId}`);
+          } catch(error) {
+            logger.error('flowExecutor', `Could not update assign for user ${userAssign.userId} in assignation ${userAssign.assignId}`);
+          }
+
+          usersFiltered.push(userAssign)
+        }
+      }
+    }
+
+    if(!usersFiltered.length) {
+      logger.warn('flowExecutor', `None user found in assignation ${channelConnection.assignId} in this schedule`);
+      return {channelConnection, user: null}
+    }
+
+    // Select randomly a user from the ones filtered
+    const userAssigned = usersFiltered[Math.floor( Math.random() * usersFiltered.length )]
+    const userIndexSchedule = (userAssigned.schedules as userIndexSchedule[]).findIndex(schedule => schedule.index === scheduleIndex);
+    (userAssigned.schedules as userIndexSchedule[])[userIndexSchedule] = {...(userAssigned.schedules as userIndexSchedule[])[userIndexSchedule], assigned: true};
+    try {
+      await storage.updateAssignUserSchedules(
+        userAssigned.userId,
+        userAssigned.assignId,
+        userAssigned.schedules as userIndexSchedule[]
+      ) 
+    } catch(error) {
+      logger.error('flowExecutor', `Could not find user index schedule for user ${userAssigned.userId} in assignation ${userAssigned.assignId}`);
+    }
+    channelConnection.userId = userAssigned.userId
+    logger.info('flowExecutor', `User ${userAssigned.userId} assigned to channel connection ${channelConnection.id}`);
+    return {channelConnection, user: userAssigned};
+  }
+
 }
 
 const flowExecutor = new FlowExecutor();

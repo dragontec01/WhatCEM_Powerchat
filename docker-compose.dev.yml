@@ -30,6 +30,7 @@ services:
         condition: service_healthy
     environment:
       NODE_ENV: ${NODE_ENV}
+      DOMAIN: ${DOMAIN}
       APP_PORT: ${APP_PORT}
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       PGHOST: postgres

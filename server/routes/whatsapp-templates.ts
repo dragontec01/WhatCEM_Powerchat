@@ -1,11 +1,11 @@
 import express from 'express';
 import { storage } from '../storage';
 import { ensureAuthenticated, requirePermission } from '../middleware';
-import { PERMISSIONS } from '@shared/db/schema';
+import { ChannelConnectionData, PERMISSIONS } from '@shared/db/schema';
 import { db } from '../db';
 import { campaignTemplates, channelConnections } from '@shared/db/schema';
 import { eq, and, desc } from 'drizzle-orm';
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import { logger } from '../utils/logger';
 import { syncSpecificTemplates } from '../services/template-status-sync';
 
@@ -831,7 +831,7 @@ router.post('/sync-from-meta', ensureAuthenticated, async (req, res) => {
       return res.status(400).json({ error: 'Selected connection is not a WhatsApp connection' });
     }
 
-    const connectionData = whatsappChannel[0].connectionData as any;
+    const connectionData = whatsappChannel[0].connectionData as ChannelConnectionData;
     const wabaId = connectionData.wabaId || connectionData.businessAccountId || connectionData.waba_id;
     const accessToken = connectionData.accessToken || connectionData.access_token;
 
@@ -969,6 +969,14 @@ router.post('/sync-from-meta', ensureAuthenticated, async (req, res) => {
     });
   } catch (error: any) {
     logger.error('whatsapp-templates', 'Error syncing templates from Meta:', error);
+    if( error instanceof AxiosError ) {
+      logger.error('whatsapp-templates', 'Axios error details:', {
+        message: error.message,
+        responseData: error.response?.data,
+        status: error.response?.status,
+        headers: error.response?.headers
+      });
+    }
     res.status(500).json({
       error: 'Failed to sync templates from Meta',
       details: error.message

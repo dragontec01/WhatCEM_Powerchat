@@ -11,6 +11,22 @@ const __dirname = path.dirname(__filename);
 const mode = process.env.NODE_ENV || process.argv[2] || 'development';
 const isProduction = mode === 'production';
 
+// Plugin to fix dayjs plugin imports by adding .js extension
+const fixDayjsImportsPlugin = {
+  name: 'fix-dayjs-imports',
+  setup(build) {
+    // Intercept dayjs plugin imports and add .js extension
+    build.onResolve({ filter: /^dayjs\/plugin\// }, args => {
+      if (args.kind === 'import-statement' || args.kind === 'require-call') {
+        return {
+          path: args.path + '.js',
+          external: true
+        };
+      }
+    });
+  }
+};
+
 
 
 
@@ -24,8 +40,12 @@ const config = {
   sourcemap: !isProduction,
   minify: isProduction,
   target: 'node18',
-
-
+  
+  // Add mainFields to help with ESM resolution
+  mainFields: ['module', 'main'],
+  
+  // Resolve extensions for proper ESM module resolution
+  resolveExtensions: ['.ts', '.js', '.mjs', '.json'],
 
   drop: isProduction ? ['debugger'] : [],
 
@@ -34,18 +54,23 @@ const config = {
   },
 
   banner: {
-    js: isProduction
-      ? '// Production build - console logs preserved for server debugging'
-      : '// Development build - console logs preserved for debugging'
+    js: `// ${isProduction ? 'Production' : 'Development'} build
+import { createRequire } from 'module';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+const require = createRequire(import.meta.url);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+`
   },
 
   logLevel: 'info',
 
   color: true,
+  
+  // Add the dayjs import fix plugin
+  plugins: [fixDayjsImportsPlugin],
 };
-
-
-config.plugins = [];
 
 
 async function build() {
