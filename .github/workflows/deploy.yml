@@ -38,31 +38,14 @@ jobs:
           # Create a tarball containing dist and package files
           tar -czf dist.tar.gz dist/ package.json package-lock.json
       
-      - name: Setup SSH with passphrase
-        env:
-          SSH_AUTH_SOCK: /tmp/ssh_agent.sock
-        run: |
-          # Start ssh-agent
-          ssh-agent -a $SSH_AUTH_SOCK > /dev/null
-          
-          # Add the private key to ssh-agent with passphrase
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" | tr -d '\r' | SSH_ASKPASS_REQUIRE=never ssh-add - <<< "${{ secrets.SSH_KEY_PHRASE }}"
-          
-          # Add server to known hosts
-          mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
-      
       - name: Deploy to server
-        env:
-          SSH_AUTH_SOCK: /tmp/ssh_agent.sock
-        run: |
-          # Upload the dist archive (ssh-agent will handle authentication)
-          scp -o StrictHostKeyChecking=no \
-            dist.tar.gz ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/tmp/
-          
-          # Connect to server and execute deployment commands
-          ssh -o StrictHostKeyChecking=no \
-            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'ENDSSH'
+        uses: appleboy/ssh-action@v1.2.4
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          passphrase: ${{ secrets.SSH_KEY_PHRASE }}
+          script: |
             set -e
             
             echo "🚀 Starting deployment process..."
@@ -110,15 +93,10 @@ jobs:
             # Show status
             echo "📊 Application status:"
             ./manage.sh status || true
-          ENDSSH
-      
+        
       - name: Cleanup
         if: always()
-        env:
-          SSH_AUTH_SOCK: /tmp/ssh_agent.sock
         run: |
-          # Kill ssh-agent
-          ssh-agent -k || true
           rm -f dist.tar.gz
       
       - name: Deployment summary
