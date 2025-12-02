@@ -38,6 +38,22 @@ jobs:
           # Create a tarball containing dist and package files
           tar -czf dist.tar.gz dist/ package.json package-lock.json
       
+      - name: Test SSH connection
+        uses: appleboy/ssh-action@v1.2.4
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          passphrase: ${{ secrets.SSH_KEY_PHRASE }}
+          port: 22
+          timeout: 30s
+          debug: true
+          script: |
+            echo "✅ SSH connection successful!"
+            echo "Server: $(hostname)"
+            echo "User: $(whoami)"
+            echo "Date: $(date)"
+      
       - name: Upload deployment archive to server
         uses: appleboy/scp-action@v1.0.0
         with:
@@ -45,8 +61,12 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           passphrase: ${{ secrets.SSH_KEY_PHRASE }}
+          port: 22
+          timeout: 60s
+          command_timeout: 10m
           source: "dist.tar.gz"
           target: "/tmp/"
+          debug: true
       
       - name: Deploy to server
         uses: appleboy/ssh-action@v1.2.4
@@ -55,6 +75,10 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           passphrase: ${{ secrets.SSH_KEY_PHRASE }}
+          port: 22
+          timeout: 60s
+          command_timeout: 30m
+          debug: true
           script: |
             set -e
             
@@ -103,6 +127,9 @@ jobs:
             # Show status
             echo "📊 Application status:"
             ./manage.sh status || true
+
+            # Delete temp dist.tar.gz
+            rm -f /tmp/dist.tar.gz
         
       - name: Cleanup
         if: always()
