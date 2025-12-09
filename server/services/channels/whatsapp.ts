@@ -1950,7 +1950,7 @@ export async function connectToWhatsApp(connectionId: number, userId: number): P
       const shouldSyncHistory = connection?.historySyncEnabled || false;
 
 
-      const { version } = await fetchLatestWaWebVersion({ timeout: 10000 }).catch((err) => {
+      const { version } = await fetchLatestWaWebVersion().catch((err) => {
         console.error('Failed to fetch latest WhatsApp version, using default:', err.message);
         return { version: undefined, isLatest: false };
       });

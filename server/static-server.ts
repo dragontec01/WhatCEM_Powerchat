@@ -32,7 +32,7 @@ export function serveStatic(app: Express) {
       
 
 
-      app.use("*", (req, res, next) => {
+      app.use((req, res, next) => {
 
         if (req.originalUrl.startsWith('/api/')) {
           return next();
@@ -62,7 +62,7 @@ export function serveStatic(app: Express) {
   app.use(express.static(distPath));
 
 
-  app.use("*", (req, res, next) => {
+  app.use((req, res, next) => {
 
     if (req.originalUrl.startsWith('/api/')) {
       return next();

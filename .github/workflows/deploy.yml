@@ -87,7 +87,9 @@ jobs:
             # Navigate to deployment directory
             cd /www/wwwroot/whatcem.com
             
-            # Change to current node version
+            # Load nvm and change to current node version
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
             nvm use 24
 
             # Backup current dist folder
