@@ -7,7 +7,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import Stripe from "stripe";
-import paypal from "@paypal/checkout-server-sdk";
+import paypal from "@paypal/paypal-server-sdk";
 import { pool } from "./db";
 import { ensureSuperAdmin } from "./middleware";
 import nodemailer from "nodemailer";
@@ -1019,7 +1019,7 @@ function registerAdminRoutes(app: Express) {
       if (!validation.success) {
         return res.status(400).json({
           error: "Invalid SMTP configuration format",
-          details: validation.error.errors
+          details: validation.error.issues
         });
       }
 
@@ -1191,7 +1191,7 @@ function registerAdminRoutes(app: Express) {
       const stripeSettings = stripeSettingObj.value as any;
 
       const stripe = new Stripe(stripeSettings.secretKey, {
-        apiVersion: '2025-08-27.basil'
+        apiVersion: '2025-11-17.clover'
       });
 
       const account = await stripe.accounts.retrieve();
@@ -1478,35 +1478,32 @@ function registerAdminRoutes(app: Express) {
 
       const paypalSettings = paypalSettingObj.value as any;
 
-      let environment;
-      if (paypalSettings.testMode) {
-        environment = new paypal.core.SandboxEnvironment(
-          paypalSettings.clientId,
-          paypalSettings.clientSecret
-        );
-      } else {
-        environment = new paypal.core.LiveEnvironment(
-          paypalSettings.clientId,
-          paypalSettings.clientSecret
-        );
-      }
-
-      const client = new paypal.core.PayPalHttpClient(environment);
-
-      const request = new paypal.orders.OrdersCreateRequest();
-      request.requestBody({
-        intent: 'CAPTURE',
-        purchase_units: [{
-          amount: {
-            currency_code: 'USD',
-            value: '0.01'
-          }
-        }]
+      const client = new paypal.Client({
+        clientCredentialsAuthCredentials: {
+          oAuthClientId: paypalSettings.clientId,
+          oAuthClientSecret: paypalSettings.clientSecret
+        },
+        environment: paypalSettings.testMode 
+          ? paypal.Environment.Sandbox 
+          : paypal.Environment.Production
       });
 
-      const response = await client.execute(request);
+      const ordersController = new paypal.OrdersController(client);
 
-      if (response.statusCode !== 201) {
+      const request = await ordersController.createOrder({
+        body: {
+          intent: paypal.CheckoutPaymentIntent.Capture,
+          purchaseUnits: [{
+            amount: {
+              currencyCode: 'USD',
+              value: '0.01'
+            }
+          }]
+        }
+      });
+
+
+      if (request.statusCode >= 400) {
         throw new Error('Failed to connect to PayPal API');
       }
 
@@ -2035,7 +2032,7 @@ function registerAdminRoutes(app: Express) {
       const stripeSettings = stripeSettingObj.value as any;
 
       const stripe = new Stripe(stripeSettings.secretKey, {
-        apiVersion: '2025-08-27.basil'
+        apiVersion: '2025-11-17.clover'
       });
 
       const signature = req.headers['stripe-signature'] as string;
@@ -3156,7 +3153,7 @@ function registerAdminRoutes(app: Express) {
       const writer = fs.createWriteStream(tempFilePath);
       response.data.pipe(writer);
 
-      await new Promise((resolve, reject) => {
+      await new Promise<void>((resolve, reject) => {
         writer.on('finish', resolve);
         writer.on('error', reject);
       });

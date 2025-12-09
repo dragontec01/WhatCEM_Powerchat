@@ -1,7 +1,7 @@
 import { Express, Request, Response, NextFunction } from "express";
 import { storage } from "./storage";
 import Stripe from "stripe";
-import paypal from "@paypal/checkout-server-sdk";
+import paypal from "@paypal/paypal-server-sdk";
 import { affiliateService } from "./services/affiliate-service";
 
 
@@ -105,7 +105,7 @@ export function registerPaymentRoutes(app: Express) {
       const stripeSettings = stripeSettingObj.value as any;
 
       const stripe = new Stripe(stripeSettings.secretKey, {
-        apiVersion: '2025-08-27.basil'
+        apiVersion: '2025-11-17.clover'
       });
 
       const transaction = await storage.createPaymentTransaction({
@@ -302,20 +302,15 @@ export function registerPaymentRoutes(app: Express) {
 
       const paypalSettings = paypalSettingObj.value as any;
 
-      let environment;
-      if (paypalSettings.testMode) {
-        environment = new paypal.core.SandboxEnvironment(
-          paypalSettings.clientId,
-          paypalSettings.clientSecret
-        );
-      } else {
-        environment = new paypal.core.LiveEnvironment(
-          paypalSettings.clientId,
-          paypalSettings.clientSecret
-        );
-      }
-
-      const client = new paypal.core.PayPalHttpClient(environment);
+      const client = new paypal.Client({
+        clientCredentialsAuthCredentials: {
+          oAuthClientId: paypalSettings.clientId,
+          oAuthClientSecret: paypalSettings.clientSecret
+        },
+        environment: paypalSettings.testMode 
+          ? paypal.Environment.Sandbox 
+          : paypal.Environment.Production
+      });
 
       const transaction = await storage.createPaymentTransaction({
         companyId: req.user.companyId,
@@ -326,30 +321,29 @@ export function registerPaymentRoutes(app: Express) {
         paymentMethod: 'paypal'
       });
 
-      const request = new paypal.orders.OrdersCreateRequest();
-      request.prefer("return=representation");
-      request.requestBody({
-        intent: 'CAPTURE',
-        purchase_units: [{
-          amount: {
-            currency_code: 'USD',
-            value: plan.price.toString()
-          },
-          description: plan.description,
-          custom_id: transaction.id.toString()
-        }] as any,
-        application_context: {
-          brand_name: 'AppName',
-          landing_page: 'BILLING',
-          user_action: 'PAY_NOW',
-          return_url: `${req.protocol}://${req.get('host')}/payment/success?source=paypal&transaction_id=${transaction.id}`,
-          cancel_url: `${req.protocol}://${req.get('host')}/payment/cancel?source=paypal&transaction_id=${transaction.id}`
-        }
+      const ordersController = new paypal.OrdersController(client);
+
+      const request = await ordersController.createOrder({
+        body: {
+          intent: paypal.CheckoutPaymentIntent.Capture,
+          purchaseUnits: [{
+            amount: {
+              currencyCode: 'USD',
+              value: plan.price.toString()
+            }
+          }],
+          applicationContext: {
+            brandName: 'AppName',
+            landingPage: paypal.OrderApplicationContextLandingPage.Billing,
+            userAction: paypal.OrderApplicationContextUserAction.PayNow,
+            returnUrl: `${req.protocol}://${req.get('host')}/payment/success?source=paypal&transaction_id=${transaction.id}`,
+            cancelUrl: `${req.protocol}://${req.get('host')}/payment/cancel?source=paypal&transaction_id=${transaction.id}`
+          }
+        },
+        prefer: "return=representation",
       });
 
-      const response = await client.execute(request);
-
-      const approvalLink = response.result.links.find((link: any) => link.rel === 'approve');
+      const approvalLink = request?.result?.links?.find((link: any) => link.rel === 'approve');
       if (!approvalLink) {
         throw new Error('PayPal approval URL not found');
       }
@@ -357,7 +351,7 @@ export function registerPaymentRoutes(app: Express) {
 
       res.json({
         checkoutUrl: approvalUrl,
-        orderId: response.result.id,
+        orderId: request?.result?.id,
         transactionId: transaction.id
       });
     } catch (error) {
@@ -572,7 +566,7 @@ export function registerPaymentRoutes(app: Express) {
 
         const stripeSettings = stripeSettingObj.value as any;
         const stripe = new Stripe(stripeSettings.secretKey, {
-          apiVersion: '2025-08-27.basil'
+          apiVersion: '2025-11-17.clover'
         });
 
         const session = await stripe.checkout.sessions.retrieve(session_id);
@@ -698,7 +692,7 @@ export function registerPaymentRoutes(app: Express) {
 
         const stripeSettings = stripeSettingObj.value as any;
         const stripe = new Stripe(stripeSettings.secretKey as string, {
-          apiVersion: '2025-08-27.basil'
+          apiVersion: '2025-11-17.clover'
         });
 
         if (session_id) {
