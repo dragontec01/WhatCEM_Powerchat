@@ -118,6 +118,9 @@ jobs:
             # Wait a moment for clean shutdown
             sleep 3
 
+            # Change to current node version
+            nvm use 24
+
             # Clean install of production dependencies
             echo "📦 Installing production dependencies..."
             cd /www/wwwroot/whatcem.com
