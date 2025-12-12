@@ -67,7 +67,7 @@ export const flows = pgTable("flows", {
   companyId: integer("company_id").references(() => companies.id),
   name: text("name").notNull(),
   description: text("description"),
-  status: text("status", { enum: flowStatusTypes.options }).notNull().default('draft'),
+  status: text("status", { enum: flowStatusTypes.options as [string, ...string[]] }).notNull().default('draft'),
   nodes: jsonb("nodes").notNull().default([]),
   edges: jsonb("edges").notNull().default([]),
   version: integer("version").notNull().default(1),

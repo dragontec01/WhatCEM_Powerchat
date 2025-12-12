@@ -11125,6 +11125,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   function ensureAdmin(req: any, res: any, next: any) {
     if (!req.isAuthenticated()) {
+      logger.info('routes', 'unauthorized access for ensure superadmin middleware');
       return res.status(401).json({ message: 'Unauthorized' });
     }
     if (req.user.role !== 'admin') {
@@ -11173,7 +11174,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!validationResult.success) {
         return res.status(400).json({
           message: 'Invalid team member data',
-          errors: validationResult.error.errors
+          errors: validationResult.error.issues
         });
       }
 
@@ -11204,7 +11205,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         whatsappNumber,
         fullName,
         password: hashedPassword,
-        role,
+        role: role as 'admin' | 'agent',
         companyId: req.user.companyId
       });
 
@@ -11234,7 +11235,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!validationResult.success) {
         return res.status(400).json({
           message: 'Invalid update data',
-          errors: validationResult.error.errors
+          errors: validationResult.error.issues
         });
       }
 
@@ -11361,7 +11362,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!validationResult.success) {
         return res.status(400).json({
           message: 'Invalid invitation data',
-          errors: validationResult.error.errors
+          errors: validationResult.error.issues
         });
       }
 
@@ -11500,7 +11501,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!validationResult.success) {
         return res.status(400).json({
           message: 'Invalid data',
-          errors: validationResult.error.errors
+          errors: validationResult.error.issues
         });
       }
 
@@ -11560,7 +11561,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!validationResult.success) {
         return res.status(400).json({
           message: 'Invalid status',
-          errors: validationResult.error.errors
+          errors: validationResult.error.issues
         });
       }
 

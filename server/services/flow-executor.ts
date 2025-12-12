@@ -330,7 +330,7 @@ class FlowExecutor extends EventEmitter {
       const baseFlow = await storage.getFlow(session.flowId);
       if (!baseFlow) return;
 
-      const flow: Flow = { ...baseFlow, definition: (baseFlow as any).definition || null };
+      const flow: Flow = { ...(baseFlow as Flow), definition: (baseFlow as any).definition || null };
       const { nodes } = await this.parseFlowDefinition(flow);
 
       const triggerNode = nodes.find((node: any) => node.id === session.triggerNodeId);
@@ -1171,7 +1171,7 @@ class FlowExecutor extends EventEmitter {
       const baseFlow = await storage.getFlow(session.flowId);
       if (!baseFlow) return false;
 
-      const flow: Flow = { ...baseFlow, definition: (baseFlow as any).definition || null };
+      const flow: Flow = { ...(baseFlow as Flow), definition: (baseFlow as any).definition || null };
       const { nodes } = await this.parseFlowDefinition(flow);
 
       const aiNode = nodes.find((node: any) => node.id === session.aiNodeId);
@@ -1281,7 +1281,7 @@ class FlowExecutor extends EventEmitter {
       if (aiNodeId && aiExitOutputHandle) {
         const baseFlow = await storage.getFlow(session.flowId);
         if (baseFlow) {
-          const flow: Flow = { ...baseFlow, definition: (baseFlow as any).definition || null };
+          const flow: Flow = { ...(baseFlow as Flow), definition: (baseFlow as any).definition || null };
           const { nodes, edges } = await this.parseFlowDefinition(flow);
 
           const aiNode = nodes.find((node: any) => node.id === aiNodeId);
@@ -1419,7 +1419,7 @@ class FlowExecutor extends EventEmitter {
         return false;
       }
 
-      const flow: Flow = { ...baseFlow, definition: (baseFlow as any).definition || null };
+      const flow: Flow = { ...(baseFlow as Flow), definition: (baseFlow as any).definition || null };
       const { nodes, edges } = await this.parseFlowDefinition(flow);
 
 
@@ -1533,7 +1533,7 @@ class FlowExecutor extends EventEmitter {
       const baseFlow = await storage.getFlow(session.flowId);
       if (!baseFlow) return false;
 
-      const flow: Flow = { ...baseFlow, definition: (baseFlow as any).definition || null };
+      const flow: Flow = { ...(baseFlow as Flow), definition: (baseFlow as any).definition || null };
       const { nodes, edges } = await this.parseFlowDefinition(flow);
 
       const currentNode = nodes.find((node: any) => node.id === session.currentNodeId);
@@ -2655,7 +2655,7 @@ class FlowExecutor extends EventEmitter {
       const baseFlow = await storage.getFlow(execution.flowId);
       if (!baseFlow) return false;
 
-      const flow: Flow = { ...baseFlow, definition: (baseFlow as any).definition || null };
+      const flow: Flow = { ...(baseFlow as Flow), definition: (baseFlow as any).definition || null };
       const { nodes, edges } = await this.parseFlowDefinition(flow);
 
       const currentNode = nodes.find((node: any) => node.id === execution.currentNodeId);
@@ -3506,7 +3506,7 @@ class FlowExecutor extends EventEmitter {
 
 
 
-      const flow: Flow = { ...baseFlow, definition: (baseFlow as any).definition || null };
+      const flow: Flow = { ...(baseFlow as Flow), definition: (baseFlow as any).definition || null };
 
 
       const { nodes, edges } = await this.parseFlowDefinition(flow);
@@ -10883,7 +10883,7 @@ ${eventResult.eventLink ? `\nView event: ${eventResult.eventLink}` : ''}`;
         const baseFlow = await storage.getFlow(assignment.flowId);
         if (!baseFlow) continue;
 
-        const flow: Flow = { ...baseFlow, definition: (baseFlow as any).definition || null };
+        const flow: Flow = { ...(baseFlow as Flow), definition: (baseFlow as any).definition || null };
         const { nodes } = await this.parseFlowDefinition(flow);
 
         const triggerNodes = nodes.filter((node: any) =>

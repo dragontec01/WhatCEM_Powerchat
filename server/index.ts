@@ -41,7 +41,7 @@ app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
   let capturedJsonResponse: Record<string, any> | undefined = undefined;
-
+  console.log({headersReceived: req.headers, queryParamsReceived: req.query});
   const originalResJson = res.json;
   res.json = function (bodyJson, ...args) {
     capturedJsonResponse = bodyJson;

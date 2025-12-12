@@ -1,12 +1,14 @@
 import { Express, Request, Response } from "express";
 import { storage } from "./storage";
 import { z } from "zod";
+import { logger } from "./utils/logger";
 
 
 const ensureAuthenticated = (req: Request, res: Response, next: any) => {
   if (req.isAuthenticated()) {
     return next();
   }
+  logger.info('planRoutes', 'unauthorized access for ensure Authenticated middleware in plan-routes.ts file');
   res.status(401).json({ message: 'Unauthorized' });
 };
 

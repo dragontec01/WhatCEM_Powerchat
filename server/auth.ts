@@ -10,6 +10,7 @@ import connectPg from "connect-pg-simple";
 import { pool } from "./db";
 import { createAffiliateReferral } from "./middleware/affiliate-tracking";
 import { subdomainMiddleware, requireSubdomainAuth } from "./middleware/subdomain";
+import { logger } from "./utils/logger";
 
 declare global {
   namespace Express {
@@ -171,6 +172,7 @@ export async function setupAuth(app: Express) {
 
   const ensureCompanyUser = async (req: Request, res: Response, next: NextFunction) => {
     if (!req.isAuthenticated()) {
+      logger.info('auth', 'unauthorized access for ensure Company user');
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
@@ -200,6 +202,7 @@ export async function setupAuth(app: Express) {
 
   const ensureSuperAdmin = (req: Request, res: Response, next: NextFunction) => {
     if (!req.isAuthenticated()) {
+      logger.info('auth', 'unauthorized access for ensure superadmin middleware in auth.ts file');
       return res.status(401).json({ message: 'Unauthorized' });
     }
 

@@ -17,6 +17,7 @@ import { registerAffiliateRoutes } from "./routes/admin/affiliate-routes";
 import adminAiCredentialsRoutes from "./routes/admin-ai-credentials";
 import { parseDialog360Error, createErrorResponse } from "./services/channels/360dialog-errors";
 import { validatePhoneNumber } from "./utils/phone-validation";
+import { logger } from "./utils/logger";
 
 interface SMTPConfig {
   enabled: boolean;
@@ -579,6 +580,7 @@ function registerAdminRoutes(app: Express) {
 
   const ensureSettingsAccess = (req: Request, res: Response, next: NextFunction) => {
     if (!req.isAuthenticated()) {
+      logger.info('adminRoutes', 'unauthorized access for ensure settings access');
       return res.status(401).json({ message: 'Unauthorized' });
     }
 

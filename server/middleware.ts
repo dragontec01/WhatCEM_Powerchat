@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { storage } from "./storage";
 import { User as SelectUser, Company, PERMISSIONS, DEFAULT_ROLE_PERMISSIONS } from "@shared/db/schema";
 import { planLimitsService } from "./services/plan-limits-service";
+import { logger } from "./utils/logger";
 
 
 export { ensureActiveSubscription, apiSubscriptionGuard, subscriptionWarning } from './middleware/subscription-guard';
@@ -10,11 +11,13 @@ export const ensureAuthenticated = (req: Request, res: Response, next: NextFunct
   if (req.isAuthenticated()) {
     return next();
   }
+  logger.info('middlewares', 'unauthorized access for ensure authenticated middleware');
   res.status(401).json({ message: 'Unauthorized' });
 };
 
 export const ensureSuperAdmin = (req: Request, res: Response, next: NextFunction) => {
   if (!req.isAuthenticated()) {
+    logger.info('middlewares', 'unauthorized access for ensure superadmin middleware in mittleware.ts file');
     return res.status(401).json({ message: 'Unauthorized' });
   }
 
@@ -35,6 +38,7 @@ export const ensureSuperAdmin = (req: Request, res: Response, next: NextFunction
 
 export const ensureAdmin = (req: Request, res: Response, next: NextFunction) => {
   if (!req.isAuthenticated()) {
+    logger.info('middlewares', 'unauthorized access for ensure admin middleware in middleware.ts file');
     return res.status(401).json({ message: 'Unauthorized' });
   }
 
@@ -48,6 +52,7 @@ export const ensureAdmin = (req: Request, res: Response, next: NextFunction) => 
 
 export const ensureCompanyUser = async (req: Request, res: Response, next: NextFunction) => {
   if (!req.isAuthenticated()) {
+    logger.info('middlewares', 'unauthorized access for ensure Company user in middleware.ts file');
     return res.status(401).json({ message: 'Unauthorized' });
   }
 
@@ -124,6 +129,7 @@ export const getUserPermissions = async (user: SelectUser): Promise<Record<strin
 export const requirePermission = (permission: string) => {
   return async (req: Request, res: Response, next: NextFunction) => {
     if (!req.isAuthenticated()) {
+      logger.info('middlewares', `unauthorized access for require permission middleware for permission: ${permission}`);
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
@@ -154,6 +160,7 @@ export const requirePermission = (permission: string) => {
 export const requireAllPermissions = (permissions: string[]) => {
   return async (req: Request, res: Response, next: NextFunction) => {
     if (!req.isAuthenticated()) {
+      logger.info('middlewares', `unauthorized access for require all permissions middleware for permissions: ${permissions.join(', ')}`);
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
@@ -187,6 +194,7 @@ export const requireAllPermissions = (permissions: string[]) => {
 export const requireAnyPermission = (permissions: string[]) => {
   return async (req: Request, res: Response, next: NextFunction) => {
     if (!req.isAuthenticated()) {
+      logger.info('middlewares', `unauthorized access for require any permission middleware for permissions: ${permissions.join(', ')}`);
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
