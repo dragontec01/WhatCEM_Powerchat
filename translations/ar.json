@@ -13892,5 +13892,153 @@
     {
         "key": "landing.cta.sign_in",
         "value": "تسجيل الدخول"
+    },
+    {
+        "key": "ai_assistant.audio_capability_process",
+        "value": "معالجة وفهم الرسائل الصوتية/ملفات الصوت"
+    },
+    {
+        "key": "ai_assistant.audio_capability_generate",
+        "value": "إنشاء استجابات صوتية باستخدام تقنية تحويل النص إلى كلام من {{provider}}"
+    },
+    {
+        "key": "ai_assistant.voice_mode_always_prompt",
+        "value": "ستستجيب برسائل نصية وصوتية لجميع التفاعلات."
+    },
+    {
+        "key": "ai_assistant.voice_mode_voice_only_prompt",
+        "value": "ستستجيب برسائل صوتية فقط عندما يرسل لك المستخدم رسالة صوتية."
+    },
+    {
+        "key": "ai_assistant.voice_mode_never_prompt",
+        "value": "ستستجيب فقط برسائل نصية."
+    },
+    {
+        "key": "ai_assistant.audio_guidelines_title",
+        "value": "قدرات معالجة الصوت:"
+    },
+    {
+        "key": "ai_assistant.audio_guidelines_intro",
+        "value": "لديك قدرات متقدمة في معالجة الصوت ويمكنك {{capabilities}}"
+    },
+    {
+        "key": "ai_assistant.audio_guidelines_important",
+        "value": "إرشادات الصوت المهمة:"
+    },
+    {
+        "key": "ai_assistant.audio_guideline_can_process",
+        "value": "يمكنك معالجة الرسائل الصوتية وملفات الصوت التي يرسلها المستخدمون إليك"
+    },
+    {
+        "key": "ai_assistant.audio_guideline_acknowledge",
+        "value": "عندما يرسل المستخدمون رسائل صوتية، اعترف بأنك تلقيت وفهمت رسالتهم الصوتية"
+    },
+    {
+        "key": "ai_assistant.audio_guideline_understand",
+        "value": "يمكنك فهم الكلام ونسخ محتوى الصوت والرد بشكل مناسب على المدخلات الصوتية"
+    },
+    {
+        "key": "ai_assistant.audio_guideline_limit",
+        "value": "الرسائل الصوتية محدودة بـ {{maxDuration}} ثانية لكفاءة المعالجة"
+    },
+    {
+        "key": "ai_assistant.audio_guideline_never_claim",
+        "value": "لا تدعي أبدًا أنك لا تستطيع معالجة الرسائل الصوتية أو ملفات الصوت - لديك قدرات كاملة في معالجة الصوت"
+    },
+    {
+        "key": "ai_assistant.audio_guideline_natural",
+        "value": "رد بشكل طبيعي على الرسائل الصوتية كما تفعل مع أي رسالة نصية"
+    },
+    {
+        "key": "ai_assistant.audio_guideline_conversational",
+        "value": "كن محادثًا. ولا تخبر المستخدم أن لديك قدرة معالجة الصوت وما إلى ذلك، فقط استجب لطلبهم مباشرة."
+    },
+    {
+        "key": "ai_assistant.error_transcription_failed",
+        "value": "فشل نسخ الصوت: {{error}}"
+    },
+    {
+        "key": "ai_assistant.error_speech_generation_failed",
+        "value": "فشل إنشاء الكلام: {{error}}"
+    },
+    {
+        "key": "ai_assistant.error_no_api_key",
+        "value": "لا يوجد مفتاح API متاح لمزود {{provider}}. يرجى تكوين بيانات الاعتماد في لوحة الإدارة أو توفير مفتاح API في إعدادات العقدة."
+    },
+    {
+        "key": "ai_assistant.error_audio_file_not_found",
+        "value": "ملف الصوت غير موجود: {{path}}"
+    },
+    {
+        "key": "ai_assistant.audio_too_long_warning",
+        "value": "رسالتك الصوتية طويلة جدًا للمعالجة. يرجى إرسال رسالة أقصر (أقل من {{maxDuration}} ثانية) أو اكتب رسالتك بدلاً من ذلك."
+    },
+    {
+        "key": "ai_assistant.voice_message_transcription_failed",
+        "value": "رسالة صوتية (فشل النسخ)"
+    },
+    {
+        "key": "ai_assistant.voice_message_transcription_error",
+        "value": "رسالة صوتية (فشل النسخ: {{error}})"
+    },
+    {
+        "key": "ai_assistant.knowledge_base_context_template",
+        "value": "بناءً على معلومات قاعدة المعرفة التالية:\n\n{{context}}\n\nيرجى الإجابة على سؤال المستخدم باستخدام هذه المعلومات عند الاقتضاء."
+    },
+    {
+        "key": "ai_assistant.knowledge_base_document_label",
+        "value": "[مستند: {{name}}] (الصلة: {{similarity}}%)"
+    },
+    {
+        "key": "ai_assistant.function_calling_rules_title",
+        "value": "قواعد استدعاء الوظائف المهمة:"
+    },
+    {
+        "key": "ai_assistant.function_calling_rule_explicit",
+        "value": "استدع الوظائف فقط عندما يطلب المستخدم صراحة الإجراء المحدد"
+    },
+    {
+        "key": "ai_assistant.function_calling_rule_no_greetings",
+        "value": "لا تستدع الوظائف للتحيات العامة أو الأسئلة أو المحادثة العادية"
+    },
+    {
+        "key": "ai_assistant.function_calling_rule_clear_intent",
+        "value": "لا تستدع الوظائف ما لم تكن هناك نية واضحة وغير غامضة من المستخدم"
+    },
+    {
+        "key": "ai_assistant.function_calling_rule_greeting_examples",
+        "value": "للتحيات مثل \"مرحبًا\"، \"أهلاً\"، \"كيف حالك؟\" - استجب بشكل طبيعي دون استدعاء أي وظائف"
+    },
+    {
+        "key": "ai_assistant.function_calling_rule_specific",
+        "value": "استخدم الوظائف فقط عندما يطلب المستخدم على وجه التحديد شيئًا يطابق غرض الوظيفة"
+    },
+    {
+        "key": "ai_assistant.function_calling_rule_conservative",
+        "value": "كن محافظًا - عند الشك، استجب بشكل طبيعي دون استدعاء الوظائف"
+    },
+    {
+        "key": "ai_assistant.respond_in_language",
+        "value": "الرد بـ {{language}}."
+    },
+    {
+        "key": "ai_assistant.default_system_prompt",
+        "value": "أنت مساعد مفيد. أجب على أسئلة المستخدمين بإيجاز ودقة. قم فقط بإجراءات محددة عندما يطلبها المستخدم صراحة."
+    },
+    {
+        "key": "flow_builder.ai_language_label",
+        "value": "لغة الاستجابة"
+    },
+    {
+        "key": "flow_builder.ai_language_description",
+        "value": "حدد اللغة التي يجب أن يستخدمها مساعد الذكاء الاصطناعي للردود"
+    },
+    {
+        "key": "flow_builder.ai_language_placeholder",
+        "value": "اختر اللغة..."
+    },
+    {
+        "key": "flow_builder.ai_default_system_prompt",
+        "value": "أنت مساعد مفيد. أجب على أسئلة المستخدمين بإيجاز ودقة. قم فقط بإجراءات محددة عندما يطلبها المستخدم صراحة."
     }
 ]

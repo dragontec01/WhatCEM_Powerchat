@@ -5,6 +5,7 @@ import { logger } from '../utils/logger';
 
 import { broadcastToCompany } from '../utils/websocket';
 import { aiFlowPerformanceMonitor } from '../utils/ai-flow-performance';
+import { ChatCompletionMessageFunctionToolCall } from 'openai/resources/index.mjs';
 
 interface ChatMessage {
   id: string;
@@ -40,8 +41,7 @@ interface ChatRequest {
   conversationHistory: ChatMessage[];
   companyId: number;
   userId: number;
-  credentialSource?: 'auto' | 'company' | 'system' | 'manual';
-  apiKey?: string;
+  credentialSource?: 'auto' | 'company' | 'system';
 }
 
 interface ChatResponse {
@@ -66,18 +66,9 @@ class AIFlowAssistantService {
    */
   private async getOpenAIClient(
     companyId: number,
-    credentialSource: 'auto' | 'company' | 'system' | 'manual' = 'auto',
-    manualApiKey?: string
+    credentialSource: 'auto' | 'company' | 'system' = 'auto'
   ): Promise<OpenAI> {
     try {
-
-      if (credentialSource === 'manual') {
-        if (!manualApiKey) {
-          throw new Error('Manual API key is required when using manual credential source.');
-        }
-        return new OpenAI({ apiKey: manualApiKey });
-      }
-
 
       const credentialResult = await aiCredentialsService.getCredentialWithPreference(
         companyId,
@@ -87,9 +78,9 @@ class AIFlowAssistantService {
 
       if (!credentialResult) {
         const errorMessages = {
-          auto: 'No OpenAI API key configured. Please configure OpenAI credentials in the AI settings or provide a manual API key.',
-          company: 'No company OpenAI credentials configured. Please set up company-specific OpenAI credentials.',
-          system: 'No system OpenAI credentials configured. Please contact your administrator.'
+          auto: 'No OpenAI API key configured. Please configure OpenAI credentials in the AI settings (Company or System level).',
+          company: 'No company OpenAI credentials configured. Please set up company-specific OpenAI credentials in the AI settings.',
+          system: 'No system OpenAI credentials configured. Please contact your administrator to configure system-level OpenAI credentials.'
         };
 
         throw new Error(errorMessages[credentialSource] || 'OpenAI API key not configured.');
@@ -121,8 +112,7 @@ class AIFlowAssistantService {
     try {
       const openai = await this.getOpenAIClient(
         request.companyId,
-        request.credentialSource || 'auto',
-        request.apiKey
+        request.credentialSource || 'auto'
       );
 
 
@@ -216,9 +206,9 @@ class AIFlowAssistantService {
       };
 
 
-      if (choice.message?.tool_calls?.[0]?.function?.name === 'generate_flow') {
+      if ((choice.message?.tool_calls?.[0] as ChatCompletionMessageFunctionToolCall).function?.name === 'generate_flow') {
         try {
-          const functionArgs = JSON.parse(choice.message.tool_calls[0].function.arguments);
+          const functionArgs = JSON.parse((choice.message?.tool_calls?.[0] as ChatCompletionMessageFunctionToolCall).function.arguments);
           const flowSuggestion = await this.createFlowSuggestion(functionArgs);
           chatResponse.flowSuggestion = flowSuggestion;
           

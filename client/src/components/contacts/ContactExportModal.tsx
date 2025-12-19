@@ -112,11 +112,12 @@ export function ContactExportModal({
     
     try {
       const exportData = {
+        exportScope: filters.exportScope,
         tags: filters.tags.length > 0 ? filters.tags : undefined,
         createdAfter: filters.createdAfter || undefined,
         createdBefore: filters.createdBefore || undefined,
         search: filters.search || undefined,
-        channel: filters.channel || undefined
+        channel: filters.channel && filters.channel !== 'all' ? filters.channel : undefined
       };
 
       const response = await fetch('/api/contacts/export', {
@@ -131,6 +132,7 @@ export function ContactExportModal({
         throw new Error('Export failed');
       }
 
+      const exportedCount = parseInt(response.headers.get('X-Exported-Count') || '0', 10);
 
       const contentDisposition = response.headers.get('Content-Disposition');
       const filename = contentDisposition
@@ -145,6 +147,19 @@ export function ContactExportModal({
       a.download = filename;
       a.click();
       window.URL.revokeObjectURL(url);
+
+      if (exportedCount === 0) {
+        toast({
+          title: t('contacts.export.success_title', 'Export Completed'),
+          description: t('contacts.export.no_contacts_message', 'Export completed but no contacts matched the selected filters.'),
+          variant: 'default',
+        });
+      } else {
+        toast({
+          title: t('contacts.export.success_title', 'Export Successful'),
+          description: t('contacts.export.success_message', 'Contacts have been exported successfully.'),
+        });
+      }
 
       toast({
         title: t('contacts.export.success_title', 'Export Successful'),

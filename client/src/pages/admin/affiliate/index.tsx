@@ -47,7 +47,8 @@ import {
   Copy,
   ExternalLink
 } from "lucide-react";
-import { formatCurrency, formatDate, cn } from "@/lib/utils";
+import { formatDate, cn } from "@/lib/utils";
+import { useCurrency } from "@/contexts/currency-context";
 import {
   ComposedChart,
   Line,
@@ -68,6 +69,7 @@ import {
   Funnel,
   LabelList
 } from 'recharts';
+import { RenderableText } from "recharts/types/component/Text";
 
 interface AffiliateMetrics {
   totalAffiliates: number;
@@ -201,6 +203,7 @@ export default function AffiliateManagementPage() {
   const { t } = useTranslation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { formatCurrency } = useCurrency();
 
 
   const generateReferralUrl = (affiliateCode: string) => {
@@ -985,7 +988,7 @@ export default function AffiliateManagementPage() {
                               }
                             />
                           ))}
-                          <LabelList dataKey="percentage" position="center" formatter={(value: number) => `${value}%`} />
+                          <LabelList dataKey="percentage" position="center" formatter={(value: RenderableText) => `${value}%`} />
                         </Pie>
                         <Tooltip formatter={(value: any, name: string) => [value, name.charAt(0).toUpperCase() + name.slice(1)]} />
                         <Legend />

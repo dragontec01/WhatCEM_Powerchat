@@ -121,6 +121,12 @@ export const ContactsRoute: React.FC<{ children: React.ReactNode }> = ({ childre
   </ProtectedRoute>
 );
 
+export const TasksRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <ProtectedRoute permissions={['view_tasks', 'manage_tasks']} requireAll={false}>
+    {children}
+  </ProtectedRoute>
+);
+
 export const PipelineRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <ProtectedRoute permissions={['view_pipeline', 'manage_pipeline']} requireAll={false}>
     {children}

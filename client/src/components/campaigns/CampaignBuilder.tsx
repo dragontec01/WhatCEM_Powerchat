@@ -356,7 +356,7 @@ export function CampaignBuilder() {
     if (campaignData.segmentId && (campaignData.whatsappAccountIds?.length || campaignData.channelIds?.length)) {
       calculateOptimalRateLimit();
     }
-  }, [campaignData.whatsappChannelType, campaignData.segmentId, campaignData.whatsappAccountIds, campaignData.channelIds]);
+  }, [campaignData.whatsappChannelType, campaignData.segmentId, campaignData.whatsappAccountIds, campaignData.channelIds, segments]);
 
 
   useEffect(() => {
@@ -556,13 +556,15 @@ export function CampaignBuilder() {
     }));
   };
 
-  const handleSegmentCreated = (newSegment: ContactSegment) => {
+  const handleSegmentCreated = async (newSegment: ContactSegment) => {
     setSegments(prev => [newSegment, ...prev]);
 
     setCampaignData(prev => ({
       ...prev,
       segmentId: newSegment.id
     }));
+
+    await fetchSegments();
 
     toast({
       title: t('common.success', 'Success'),
@@ -675,13 +677,14 @@ export function CampaignBuilder() {
 
         setSegments(prev => prev.filter(s => s.id !== segmentId));
 
-
         if (campaignData.segmentId === segmentId) {
           setCampaignData(prev => ({
             ...prev,
             segmentId: undefined
           }));
         }
+
+        await fetchSegments();
 
         toast({
           title: t('common.success', 'Success'),
@@ -1352,11 +1355,15 @@ export function CampaignBuilder() {
                     const segment = segments.find(s => s.id === campaignData.segmentId);
                     return segment ? (
                       <div>
-                        <h4 className="font-medium">{segment.name}</h4>
-                        <p className="text-sm text-muted-foreground">{segment.description}</p>
-                        <p className="text-sm mt-2">
-                          <strong>{segment.contactCount}</strong> {t('campaigns.builder.audience.will_receive', 'contacts will receive this campaign')}
-                        </p>
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h4 className="font-medium">{segment.name}</h4>
+                            <p className="text-sm text-muted-foreground">{segment.description}</p>
+                            <p className="text-sm mt-2">
+                              <strong>{segment.contactCount}</strong> {t('campaigns.builder.audience.unique_contacts_will_receive', 'unique contacts will receive this campaign')}
+                            </p>
+                          </div>
+                        </div>
                       </div>
                     ) : null;
                   })()}
@@ -1478,7 +1485,7 @@ export function CampaignBuilder() {
               {!isOfficialTemplateSelected() && (
                 <div className="mt-2">
                   <VariableInsertion
-                    textareaRef={contentTextareaRef}
+                    textareaRef={contentTextareaRef as React.RefObject<HTMLTextAreaElement>}
                     value={campaignData.content}
                     onChange={(content) => setCampaignData(prev => ({ ...prev, content }))}
                     customVariables={['company', 'position', 'location', 'industry']}

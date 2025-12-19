@@ -17,8 +17,7 @@ const chatRequestSchema = z.object({
     content: z.string(),
     timestamp: z.string().transform(str => new Date(str))
   })).default([]),
-  credentialSource: z.enum(['auto', 'company', 'system', 'manual']).default('auto'),
-  apiKey: z.string().optional()
+  credentialSource: z.enum(['auto', 'company', 'system']).default('auto')
 });
 
 const flowAnalysisSchema = z.object({
@@ -67,7 +66,7 @@ router.post('/chat', ensureAuthenticated, async (req, res) => {
       return res.status(400).json({
         success: false,
         error: 'Invalid request data',
-        details: error.errors
+        details: error.issues
       });
     }
 
@@ -128,7 +127,7 @@ Provide specific, actionable suggestions.`;
       return res.status(400).json({
         success: false,
         error: 'Invalid request data',
-        details: error.errors
+        details: error.issues
       });
     }
 

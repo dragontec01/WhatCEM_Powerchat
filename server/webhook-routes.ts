@@ -3,14 +3,17 @@ import { storage } from "./storage";
 import whatsAppOfficialService from "./services/channels/whatsapp-official";
 import whatsApp360DialogPartnerService from "./services/channels/whatsapp-360dialog-partner";
 import TikTokService from "./services/channels/tiktok";
+import instagramService from './services/channels/instagram';
+import twilioSmsService from './services/channels/twilio-sms';
+import webchatService from './services/channels/webchat';
 import {
   create360DialogWebhookSecurity,
   createWhatsAppWebhookSecurity,
   createTikTokWebhookSecurity,
-  verifyWhatsAppWebhookSignature,
   logWebhookSecurityEvent
 } from "./middleware/webhook-security";
 import { logTikTokWebhookEvent } from "./utils/webhook-logger";
+import { logger } from "./utils/logger";
 
 /**
  * Register webhook endpoints before any JSON middleware to avoid body parsing conflicts
@@ -18,25 +21,34 @@ import { logTikTokWebhookEvent } from "./utils/webhook-logger";
  */
 export function registerWebhookRoutes(app: Express): void {
   
+  app.post('/api/webhooks/webchat',
+    express.json(),
+    async (req, res) => {
+      try {
+        const payload = req.body;
+        const { token } = payload || {};
+
+
+        const connection = await webchatService.verifyWidgetToken(token);
+        if (!connection) {
+          return res.status(401).json({ error: 'Invalid token' });
+        }
+
+        await webchatService.processWebhook(payload, connection.companyId);
+        res.status(200).send('OK');
+      } catch (error) {
+        console.error('Error processing WebChat webhook:', error);
+        res.status(500).send('Internal Server Error');
+      }
+    }
+  );
 
   app.get('/api/webhooks/whatsapp', async (req, res) => {
     const mode = req.query['hub.mode'];
     const token = req.query['hub.verify_token'];
     const challenge = req.query['hub.challenge'];
 
-
-    console.log('WhatsApp webhook verification attempt:', {
-      mode,
-      token: token ? `${token.toString().substring(0, 8)}...` : 'undefined',
-      challenge: challenge ? `${challenge.toString().substring(0, 8)}...` : 'undefined',
-      userAgent: req.get('User-Agent'),
-      ip: req.ip,
-      ips: req.ips, // Array of IPs when behind proxy
-      forwardedFor: req.get('X-Forwarded-For'),
-      realIp: req.get('X-Real-IP'),
-      host: req.get('Host'),
-      protocol: req.protocol
-    });
+    logger.info('webhook-routes', 'WhatsApp webhook verification attempt');
 
     if (mode !== 'subscribe') {
 
@@ -63,15 +75,7 @@ export function registerWebhookRoutes(app: Express): void {
       if (matchingConnection || isGlobalMatch) {
                 res.status(200).send(challenge);
       } else {
-        console.log('❌ WhatsApp webhook verification failed:', {
-          receivedToken: token,
-          globalToken: globalToken,
-          checkedConnections: whatsappConnections.length,
-          availableTokens: whatsappConnections.map(conn => {
-            const data = conn.connectionData as any;
-            return data?.verifyToken ? `${data.verifyToken.substring(0, 8)}...` : 'none';
-          })
-        });
+        logger.warn('webhook-routes', 'WhatsApp webhook verification failed');
         res.status(403).send('Forbidden');
       }
     } catch (error) {
@@ -80,6 +84,49 @@ export function registerWebhookRoutes(app: Express): void {
     }
   });
 
+  app.post('/api/webhooks/twilio/sms',
+    express.urlencoded({ extended: false }),
+    async (req, res) => {
+      try {
+        const signature = req.get('x-twilio-signature') as string | undefined;
+        
+        const protocol = req.get('x-forwarded-proto') || req.protocol;
+        const host = req.get('x-forwarded-host') || req.get('host');
+        const fullUrl = `${protocol}://${host}${req.originalUrl}`;
+        
+        const result = await twilioSmsService.processInboundWebhook(fullUrl, req.body as any, signature);
+
+        return res.sendStatus(result.status);
+      } catch (error) {
+        console.error('❌ [TWILIO SMS WEBHOOK] Error processing inbound webhook:', error);
+        console.error('❌ [TWILIO SMS WEBHOOK] Error stack:', error instanceof Error ? error.stack : 'N/A');
+
+        return res.sendStatus(500);
+      }
+    }
+  );
+
+  app.post('/api/webhooks/twilio/sms-status',
+    express.urlencoded({ extended: false }),
+    async (req, res) => {      
+      try {
+        const signature = req.get('x-twilio-signature') as string | undefined;
+        
+        const protocol = req.get('x-forwarded-proto') || req.protocol;
+        const host = req.get('x-forwarded-host') || req.get('host');
+        const fullUrl = `${protocol}://${host}${req.originalUrl}`;
+        
+        const result = await twilioSmsService.processStatusWebhook(fullUrl, req.body as any, signature);
+        
+        return res.sendStatus(result.status);
+      } catch (error) {
+        console.error('❌ [TWILIO SMS STATUS] Error processing status webhook:', error);
+        console.error('❌ [TWILIO SMS STATUS] Error stack:', error instanceof Error ? error.stack : 'N/A');
+
+        return res.sendStatus(500);
+      }
+    }
+  );
 
   app.post('/api/webhooks/whatsapp',
     createWhatsAppWebhookSecurity(),
@@ -89,30 +136,9 @@ export function registerWebhookRoutes(app: Express): void {
       const signature = req.headers['x-hub-signature-256'] as string;
       const body = req.body;
 
-      console.log('WhatsApp webhook received:', {
-        hasSignature: !!signature,
-        bodyType: typeof body,
-        bodyConstructor: body?.constructor?.name,
-        isBuffer: Buffer.isBuffer(body),
-        bodyLength: body?.length || 'unknown',
-        contentType: req.get('content-type'),
-        ip: req.ip,
-        ips: req.ips,
-        forwardedFor: req.get('X-Forwarded-For'),
-        realIp: req.get('X-Real-IP'),
-        host: req.get('Host'),
-        protocol: req.protocol,
-        headers: {
-          'x-hub-signature-256': signature ? 'present' : 'missing',
-          'user-agent': req.get('user-agent'),
-          'content-length': req.get('content-length')
-        }
-      });
-
+      logger.info('webhook-routes', 'WhatsApp webhook received');
 
       const payload = JSON.parse(body.toString());
-
-      
 
       let phoneNumberId: string | null = null;
       if (payload.entry && payload.entry.length > 0) {
@@ -210,6 +236,119 @@ export function registerWebhookRoutes(app: Express): void {
     }
   });
 
+  /**
+   * Instagram webhook verification endpoint (GET)
+   */
+  app.get('/api/webhooks/instagram', async (req, res) => {
+    const mode = req.query['hub.mode'];
+    const token = req.query['hub.verify_token'];
+    const challenge = req.query['hub.challenge'];
+
+    if (mode !== 'subscribe') {
+      return res.status(403).send('Forbidden');
+    }
+
+    try {
+      const instagramConnections = await storage.getChannelConnectionsByType('instagram');
+      let matchingConnection = null;
+      for (const connection of instagramConnections) {
+        const connectionData = connection.connectionData as any;
+        if (connectionData?.verifyToken === token) {
+          matchingConnection = connection;
+          break;
+        }
+      }
+
+      const globalToken = process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN;
+      const isGlobalMatch = globalToken && token === globalToken;
+
+      if (matchingConnection || isGlobalMatch) {
+        res.status(200).send(challenge);
+      } else {
+        res.status(403).send('Forbidden');
+      }
+    } catch (error) {
+      console.error('Error during Instagram webhook verification:', error);
+      res.status(500).send('Internal Server Error');
+    }
+  });
+
+  app.post('/api/webhooks/instagram',
+    express.raw({ type: 'application/json' }),
+    async (req, res) => {
+    try {
+      const signature = req.headers['x-hub-signature-256'] as string;
+      const body = req.body;
+
+      console.log('🔍 [INSTAGRAM WEBHOOK] Headers:', JSON.stringify({
+        'x-hub-signature-256': signature ? 'present' : 'missing',
+        'content-type': req.headers['content-type'],
+        'user-agent': req.headers['user-agent']
+      }, null, 2));
+
+      if (!Buffer.isBuffer(body)) {
+        console.error('❌ [INSTAGRAM WEBHOOK] Body parsing error: expected raw body Buffer');
+        return res.status(400).send('Invalid request body - expected raw body');
+      }
+
+      const payload = JSON.parse(body.toString());
+
+      console.log('🔍 [INSTAGRAM WEBHOOK] Payload structure:', {
+        hasEntry: !!payload?.entry,
+        entryCount: Array.isArray(payload?.entry) ? payload.entry.length : 0,
+        entryIds: Array.isArray(payload?.entry) ? payload.entry.map((e: any) => e.id) : []
+      });
+
+      let targetConnection = null;
+      if (payload?.entry && Array.isArray(payload.entry) && payload.entry.length > 0) {
+        const instagramAccountId = payload.entry[0]?.id;
+
+        
+        if (instagramAccountId) {
+          const instagramConnections = await storage.getChannelConnectionsByType('instagram');
+          console.log('🔍 [INSTAGRAM WEBHOOK] Available Instagram connections:', instagramConnections.map((conn: any) => ({
+            id: conn.id,
+            accountName: conn.accountName,
+            instagramAccountId: (conn.connectionData as any)?.instagramAccountId,
+            companyId: conn.companyId,
+            status: conn.status
+          })));
+          
+          targetConnection = instagramConnections.find((conn: any) => {
+            const connectionData = conn.connectionData as any;
+            return connectionData?.instagramAccountId === instagramAccountId;
+          });
+          
+          if (targetConnection) {
+            
+          } else {
+            console.warn('⚠️ [INSTAGRAM WEBHOOK] No matching connection found for Instagram Account ID:', instagramAccountId);
+          }
+        }
+      }
+
+      if (!targetConnection) {
+
+        const instagramConnections = await storage.getChannelConnectionsByType('instagram');
+        const activeConnections = instagramConnections.filter((conn: any) => 
+          conn.status === 'active' || conn.status === 'error'
+        );
+        
+        if (activeConnections.length > 0) {
+          targetConnection = activeConnections[0]; // Use the first available connection
+          
+        }
+      }
+
+      await instagramService.processWebhook(payload, signature, targetConnection?.companyId || undefined);
+
+
+      res.status(200).send('OK');
+    } catch (error) {
+      console.error('❌ [INSTAGRAM WEBHOOK] Error processing webhook:', error);
+      res.status(500).send('Internal Server Error');
+    }
+  });
 
   app.post('/api/webhooks/360dialog-partner',
     create360DialogWebhookSecurity(),
@@ -238,7 +377,6 @@ export function registerWebhookRoutes(app: Express): void {
       }
     }
   );
-
 
   app.post('/api/webhooks/360dialog-messaging',
     create360DialogWebhookSecurity(),
@@ -269,9 +407,6 @@ export function registerWebhookRoutes(app: Express): void {
   );
 
 
-
-
-
   /**
    * TikTok webhook verification endpoint (GET)
    * TikTok sends a verification request when setting up webhooks
@@ -281,14 +416,7 @@ export function registerWebhookRoutes(app: Express): void {
       const challenge = req.query['challenge'];
       const verifyToken = req.query['verify_token'];
 
-      console.log('TikTok webhook verification attempt:', {
-        hasChallenge: !!challenge,
-        hasVerifyToken: !!verifyToken,
-        verifyToken: verifyToken ? `${verifyToken.toString().substring(0, 8)}...` : 'undefined',
-        userAgent: req.get('User-Agent'),
-        ip: req.ip
-      });
-
+      logger.info('webhook-routes', 'TikTok webhook verification attempt');
 
       try {
         const platformConfig = await TikTokService.getPlatformConfig();
@@ -338,19 +466,7 @@ export function registerWebhookRoutes(app: Express): void {
         const signature = req.headers['x-tiktok-signature'] as string;
         const body = req.body;
 
-        console.log('TikTok webhook received:', {
-          hasSignature: !!signature,
-          bodyType: typeof body,
-          bodyConstructor: body?.constructor?.name,
-          isBuffer: Buffer.isBuffer(body),
-          bodyLength: body?.length || 'unknown',
-          contentType: req.get('content-type'),
-          headers: {
-            'x-tiktok-signature': signature ? 'present' : 'missing',
-            'user-agent': req.get('user-agent')
-          }
-        });
-
+        logger.info('webhook-routes', 'TikTok webhook received');
 
         const payload = JSON.parse(body.toString());
         eventType = payload.event_type || payload.type || 'unknown';

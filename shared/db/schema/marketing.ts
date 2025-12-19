@@ -4,6 +4,27 @@ import z from "zod";
 import { companies, users, contacts, conversations, messages } from "./base";
 import { channelConnections } from "./assigns";
 
+/**
+ * Shared TypeScript type for segment filter criteria.
+ * 
+ * This type defines the structure of criteria used in contact segments.
+ * All fields are optional, allowing flexible filtering combinations.
+ * 
+ * Fields:
+ * - tags: Array of tag strings that contacts must have (AND logic)
+ * - created_after: ISO date string for filtering contacts created after this date
+ * - created_before: ISO date string for filtering contacts created before this date
+ * - excludedContactIds: Array of contact IDs to exclude from the segment
+ */
+export interface SegmentFilterCriteria {
+  tags?: string[];
+  created_after?: string;
+  created_before?: string;
+  excludedContactIds?: number[];
+  contactIds?: number[];
+  [key: string]: any; // Allow additional fields for extensibility
+}
+
 export const campaignStatusTypes = z.enum([
   'draft',
   'scheduled',
@@ -376,6 +397,57 @@ export const campaignQueue = pgTable("campaign_queue", {
   updatedAt: timestamp("updated_at").notNull().defaultNow()
 });
 
+export const whatsappProxyServers = pgTable("whatsapp_proxy_servers", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: 'cascade' }),
+  name: text("name").notNull(),
+  enabled: boolean("enabled").notNull().default(true),
+  type: text("type", { enum: ['http', 'https', 'socks5'] }).notNull(),
+  host: text("host").notNull(),
+  port: integer("port").notNull(),
+  username: text("username"),
+  password: text("password"),
+  testStatus: text("test_status", { enum: ['untested', 'working', 'failed'] }).default('untested'),
+  lastTested: timestamp("last_tested"),
+  description: text("description"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow()
+});
+
+export const insertWhatsappProxyServerSchema = createInsertSchema(whatsappProxyServers).pick({
+  companyId: true,
+  name: true,
+  enabled: true,
+  type: true,
+  host: true,
+  port: true,
+  username: true,
+  password: true,
+  testStatus: true,
+  lastTested: true,
+  description: true
+});
+
+export const calls = pgTable("calls", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").references(() => companies.id),
+  channelId: integer("channel_id").references(() => channelConnections.id),
+  contactId: integer("contact_id").references(() => contacts.id),
+  conversationId: integer("conversation_id").references(() => conversations.id),
+  direction: text("direction"), // 'inbound' | 'outbound'
+  status: text("status"), // 'ringing' | 'in-progress' | 'completed' | 'failed' | 'busy' | 'no-answer'
+  from: text("from"),
+  to: text("to"),
+  durationSec: integer("duration_sec"),
+  startedAt: timestamp("started_at"),
+  endedAt: timestamp("ended_at"),
+  recordingUrl: text("recording_url"),
+  recordingSid: text("recording_sid"),
+  twilioCallSid: text("twilio_call_sid"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow()
+});
+
 export type CampaignTemplate = typeof campaignTemplates.$inferSelect;
 export type InsertCampaignTemplate = z.infer<typeof insertCampaignTemplateSchema>;
 
@@ -401,3 +473,6 @@ export type CampaignStatus = z.infer<typeof campaignStatusTypes>;
 export type CampaignType = z.infer<typeof campaignTypes>;
 export type CampaignRecipientStatus = z.infer<typeof campaignRecipientStatusTypes>;
 export type WhatsappConnectionStatus = z.infer<typeof whatsappConnectionStatusTypes>;
+
+export type WhatsappProxyServer = typeof whatsappProxyServers.$inferSelect;
+export type InsertWhatsappProxyServer = z.infer<typeof insertWhatsappProxyServerSchema>;

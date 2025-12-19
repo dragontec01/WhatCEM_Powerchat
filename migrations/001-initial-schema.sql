@@ -1072,6 +1072,8 @@ BEGIN
       "manage_pipeline": true,
       "view_calendar": true,
       "manage_calendar": true,
+      "view_tasks": true,
+      "manage_tasks": true,
       "view_campaigns": true,
       "create_campaigns": true,
       "edit_campaigns": true,
@@ -1110,6 +1112,8 @@ BEGIN
       "manage_pipeline": false,
       "view_calendar": true,
       "manage_calendar": false,
+      "view_tasks": true,
+      "manage_tasks": false,
       "view_campaigns": true,
       "create_campaigns": false,
       "edit_campaigns": false,
@@ -2043,7 +2047,48 @@ BEGIN
   RAISE NOTICE 'Campaign permissions added to all companies successfully!';
 END $$;
 
+-- Add task permissions to all existing companies
+DO $$
+DECLARE
+  company_record RECORD;
+  current_permissions jsonb;
+BEGIN
+  FOR company_record IN SELECT id FROM companies LOOP
+    -- Update admin role permissions
+    SELECT COALESCE(permissions, '{}'::jsonb) INTO current_permissions
+    FROM role_permissions
+    WHERE company_id = company_record.id AND role = 'admin';
 
+    -- Add task permissions for admin
+    current_permissions := current_permissions || '{
+      "view_tasks": true,
+      "manage_tasks": true
+    }'::jsonb;
+
+    INSERT INTO role_permissions (company_id, role, permissions)
+    VALUES (company_record.id, 'admin', current_permissions)
+    ON CONFLICT (company_id, role)
+    DO UPDATE SET permissions = current_permissions;
+
+    -- Update agent role permissions
+    SELECT COALESCE(permissions, '{}'::jsonb) INTO current_permissions
+    FROM role_permissions
+    WHERE company_id = company_record.id AND role = 'agent';
+
+    -- Add task permissions for agent (view only)
+    current_permissions := current_permissions || '{
+      "view_tasks": true,
+      "manage_tasks": false
+    }'::jsonb;
+
+    INSERT INTO role_permissions (company_id, role, permissions)
+    VALUES (company_record.id, 'agent', current_permissions)
+    ON CONFLICT (company_id, role)
+    DO UPDATE SET permissions = current_permissions;
+  END LOOP;
+
+  RAISE NOTICE 'Task permissions added to all companies successfully!';
+END $$;
 
 
 

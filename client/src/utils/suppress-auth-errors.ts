@@ -30,24 +30,6 @@ export function suppressAuthErrors() {
   };
   
 
-  console.warn = (...args: any[]) => {
-    const message = args.join(' ');
-    if (message.includes('401') || message.includes('Unauthorized')) {
-      return;
-    }
-    originalWarn.apply(console, args);
-  };
-  
-
-  console.log = (...args: any[]) => {
-    const message = args.join(' ');
-    if (message.includes('401') || message.includes('Unauthorized')) {
-      return;
-    }
-    originalLog.apply(console, args);
-  };
-  
-
   const originalWindowError = window.onerror;
   window.onerror = (message, source, lineno, colno, error) => {
     if (typeof message === 'string' && (message.includes('401') || message.includes('Unauthorized'))) {

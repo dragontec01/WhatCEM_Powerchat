@@ -12,24 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ContactAvatar } from '@/components/contacts/ContactAvatar';
 import { useProfilePicture } from '@/hooks/use-profile-picture';
 import { Loader2, Upload, X } from 'lucide-react';
-
-interface Contact {
-  id: number;
-  name: string;
-  email: string | null;
-  phone: string | null;
-  company: string | null;
-  avatarUrl: string | null;
-  tags: string[] | null;
-  isActive: boolean | null;
-  identifier: string | null;
-  identifierType: string | null;
-  source: string | null;
-  notes: string | null;
-  createdAt: Date | null;
-  updatedAt: Date | null;
-  companyId: number | null;
-}
+import { Contact } from '@shared/db/schema';
 
 interface EditContactDialogProps {
   contact: Contact | null;

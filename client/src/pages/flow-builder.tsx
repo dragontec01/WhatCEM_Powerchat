@@ -52,6 +52,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   AlertCircle,
   ArrowRightCircle,
+  Bot,
   Brain,
   Calendar as CalendarIcon,
   Clock,
@@ -3595,10 +3596,11 @@ function TriggerNode({ data, isConnectable, id }: any) {
                   type="checkbox"
                   id={`session-persistence-${id}`}
                   checked={enableSessionPersistence}
-                  onChange={(e) => handleEnableSessionPersistenceChange(e.target.checked)}
-                  className="w-3 h-3"
+                  readOnly
+                  disabled
+                  className="w-3 h-3 opacity-50 cursor-not-allowed"
                 />
-                <label htmlFor={`session-persistence-${id}`} className="text-xs">{t('flow_builder.trigger_enable', 'Enable')}</label>
+                <label htmlFor={`session-persistence-${id}`} className="text-xs text-gray-500 cursor-not-allowed">{t('flow_builder.trigger_enable', 'Enable')}</label>
               </div>
             </div>
             <div className="text-[9px] text-muted-foreground mb-2">
@@ -5098,6 +5100,7 @@ function FlowEditor() {
   const [loading, setLoading] = useState(false);
   const [isAutoArranging, setIsAutoArranging] = useState(false);
   const [previousNodePositions, setPreviousNodePositions] = useState<Node[]>([]);
+  const [isAIAssistantOpen, setIsAIAssistantOpen] = useState(false);
 
   const { data: flowData, isLoading: isLoadingFlow } = useQuery({
     queryKey: ['/api/flows', flowId],
@@ -5390,7 +5393,7 @@ function FlowEditor() {
             provider: 'openai',
             model: 'gpt-4o',
             apiKey: '',
-            prompt: 'You are a helpful assistant. Answer user questions concisely and accurately.\n\nWhen users request calendar-related tasks, you can:\n- Book appointments and meetings\n- Check availability for scheduling\n- Update or modify appointments\n- Cancel appointments when needed\n\nFor appointment booking:\n1. First check availability using the check_availability function\n2. Collect necessary details (title, date, time, attendees, location)\n3. Confirm all details with the user before booking\n4. Use book_appointment function to create the calendar event\n5. Provide confirmation with event details\n\nAlways be professional and ensure you have all required information before making calendar changes. Also make sure to ask the user about their email if they wish to know the previous appointments. So that we can fetch the previous appointments from the  calendar. Also make sure to not share any sensitive information with the user like appointemnts made by other users etc. Only give info to the user if they are the owner of the appointment.',
+            prompt: 'You are a helpful assistant. Answer user questions concisely and accurately.\n\nWhen users request calendar-related tasks, you can:\n- Book appointments and meetings\n- Check availability for scheduling\n- Update or modify appointments\n- Cancel appointments when needed\n\nFor appointment booking:\n1. First check availability\n2. Collect necessary details (title, date, time, attendees,email, location)\n3. Confirm all details with the user before booking\n4. Provide confirmation with event details\n\nAlways be professional and ensure you have all required information before making calendar changes. Also make sure to ask the user about their email if they wish to know the previous appointments. So that we can fetch the previous appointments from the  calendar. Also make sure to not share any sensitive information with the user like appointemnts made by other users etc. Only give info to the user if they are the owner of the event.',
             enableHistory: true,
             enableAudio: false,
             enableTaskExecution: false,
@@ -5895,6 +5898,23 @@ function FlowEditor() {
                 </Tooltip>
               </TooltipProvider>
             )}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsAIAssistantOpen(true)}
+                    className="flex-1 sm:flex-none"
+                  >
+                    <Bot className="h-4 w-4 mr-2" />
+                    {t('flow_builder.main.ai_assistant', 'AI Assistant')}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{t('flow_builder.main.ai_assistant_tooltip', 'Get AI-powered suggestions for your flow')}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             <Link href="/flows" className="flex-1 sm:flex-none">
               <Button variant="outline" className="w-full">{t('common.cancel', 'Cancel')}</Button>
             </Link>
@@ -6004,6 +6024,8 @@ function FlowEditor() {
           flowId={flowId || undefined}
           onApplyFlow={handleApplyAIFlow}
           onAddNode={onAddNode}
+          isOpen={isAIAssistantOpen}
+          onClose={() => setIsAIAssistantOpen(false)}
         />
       </div>
     </div>

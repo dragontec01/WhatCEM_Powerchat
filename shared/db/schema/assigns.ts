@@ -2,6 +2,7 @@ import { pgTable, serial, integer, text, jsonb, timestamp, boolean, unique } fro
 import { createInsertSchema } from "drizzle-zod";
 import z from "zod";
 import { companies, userGroups, users } from "./base";
+import { whatsappProxyServers } from "./marketing";
 
 
 export const channelTypes = z.enum([
@@ -13,7 +14,10 @@ export const channelTypes = z.enum([
   "instagram",
   "email",
   "telegram",
-  "tiktok"
+  "tiktok",
+  "webchat",
+  "twilio_sms",
+  "twilio_voice"
 ]);
 
 export interface ChannelConnectionData {
@@ -48,6 +52,15 @@ export const channelConnections = pgTable("channel_connections", {
   historySyncTotal: integer("history_sync_total").default(0),
   lastHistorySyncAt: timestamp("last_history_sync_at"),
   historySyncError: text("history_sync_error"),
+  proxyServerId: integer("proxy_server_id").references(() => whatsappProxyServers.id, { onDelete: 'set null' }),
+  proxyEnabled: boolean("proxy_enabled").default(false),
+  proxyType: text("proxy_type", { enum: ['http', 'https', 'socks5'] }),
+  proxyHost: text("proxy_host"),
+  proxyPort: integer("proxy_port"),
+  proxyUsername: text("proxy_username"),
+  proxyPassword: text("proxy_password"),
+  proxyTestStatus: text("proxy_test_status", { enum: ['untested', 'working', 'failed'] }).default('untested'),
+  proxyLastTested: timestamp("proxy_last_tested"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow()
 });
@@ -66,7 +79,47 @@ export const insertChannelConnectionSchema = createInsertSchema(channelConnectio
   historySyncProgress: true,
   historySyncTotal: true,
   lastHistorySyncAt: true,
-  historySyncError: true
+  historySyncError: true,
+  proxyServerId: true,
+  proxyEnabled: true,
+  proxyType: true,
+  proxyHost: true,
+  proxyPort: true,
+  proxyUsername: true,
+  proxyPassword: true,
+  proxyTestStatus: true,
+  proxyLastTested: true
+}).superRefine((data, ctx) => {
+
+  if (data.proxyEnabled === true) {
+    if (!data.proxyType) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['proxyType'],
+        message: 'Proxy type is required when proxy is enabled'
+      });
+    }
+    if (!data.proxyHost) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['proxyHost'],
+        message: 'Proxy host is required when proxy is enabled'
+      });
+    }
+    if (!data.proxyPort) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['proxyPort'],
+        message: 'Proxy port is required when proxy is enabled'
+      });
+    } else if (data.proxyPort < 1 || data.proxyPort > 65535) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['proxyPort'],
+        message: 'Proxy port must be between 1 and 65535'
+      });
+    }
+  }
 });
 
 export interface scheduleMilestone {
