@@ -60,7 +60,7 @@ export function setupSecurityMiddleware(app: any) {
     );
   };
 
-  app.options('/api/webchat/*', (req: Request, res: Response) => {
+  app.options('/api/webchat/{*splat}', (req: Request, res: Response) => {
     if (isWebChatWidgetEndpoint(req.path)) {
       res.setHeader('Access-Control-Allow-Origin', '*');
       res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
