@@ -18,6 +18,7 @@
     "build:development": "cross-env NODE_ENV=development vite build && node scripts/esbuild.config.js development",
     "build:base": "npm run build:production",
     "build:dev": "npm run build:development",
+    "build:verify": "node scripts/verify-console-removal.js",
     "start": "cross-env NODE_ENV=production node --require dotenv/config dist/index.js",
     "check": "tsc",
     "db:push": "drizzle-kit push",
