@@ -8,7 +8,7 @@ import path from "path";
 import fs from "fs";
 import Stripe from "stripe";
 import paypal from "@paypal/paypal-server-sdk";
-import { pool } from "./db";
+import { pool, db } from "./db";
 import { ensureSuperAdmin } from "./middleware";
 import nodemailer from "nodemailer";
 import { createCipheriv, createDecipheriv, randomBytes as cryptoRandomBytes } from "crypto";
@@ -18,12 +18,15 @@ import adminAiCredentialsRoutes from "./routes/admin-ai-credentials";
 import { parseDialog360Error, createErrorResponse } from "./services/channels/360dialog-errors";
 import { validatePhoneNumber } from "./utils/phone-validation";
 import { logger } from "./utils/logger";
+import { databaseBackupLogs } from "../shared/db/schema";
+import { desc, sql } from "drizzle-orm";
+import { invalidateSubdomainCache } from "./middleware/subdomain";
 
 interface SMTPConfig {
   enabled: boolean;
   host?: string;
   port?: number;
-  security?: 'none' | 'ssl' | 'starttls';
+  security?: 'none' | 'ssl';
   username?: string;
   password?: string;
   fromName?: string;
@@ -107,7 +110,7 @@ const smtpConfigSchema = z.object({
   enabled: z.boolean().default(false),
   host: z.string().optional(),
   port: z.number().int().min(1).max(65535).optional(),
-  security: z.enum(['none', 'ssl', 'starttls']).optional(),
+  security: z.enum(['none', 'ssl']).optional(),
   username: z.string().optional(),
   password: z.string().optional(),
   fromName: z.string().optional(),
@@ -130,7 +133,7 @@ function validateEnabledSmtp(config: SMTPConfig): ValidationResult {
     errors.push({ field: 'port', message: 'Valid port number is required when SMTP is enabled' });
   }
 
-  if (!config.security || !['none', 'ssl', 'starttls'].includes(config.security)) {
+  if (!config.security || !['none', 'ssl'].includes(config.security)) {
     errors.push({ field: 'security', message: 'Valid security type is required when SMTP is enabled' });
   }
 
@@ -167,12 +170,7 @@ async function createSMTPTransporter(config: SMTPConfig): Promise<nodemailer.Tra
 
   if (config.security === 'ssl') {
     transportConfig.secure = true;
-  } else if (config.security === 'starttls') {
-    transportConfig.secure = false;
-    transportConfig.requireTLS = true;
-    transportConfig.tls = {
-      rejectUnauthorized: false
-    };
+
   } else {
     transportConfig.secure = false;
     transportConfig.ignoreTLS = true;
@@ -633,7 +631,8 @@ function registerAdminRoutes(app: Express) {
         return res.status(400).json({ error: "No file uploaded" });
       }
 
-      const logoUrl = `/uploads/branding/${req.file.filename}`;
+      const timestamp = Date.now();
+      const logoUrl = `/uploads/branding/${req.file.filename}?v=${timestamp}`;
 
       await storage.saveAppSetting('branding_logo', logoUrl);
 
@@ -665,7 +664,8 @@ function registerAdminRoutes(app: Express) {
         return res.status(400).json({ error: "No file uploaded" });
       }
 
-      const faviconUrl = `/uploads/branding/${req.file.filename}`;
+      const timestamp = Date.now();
+      const faviconUrl = `/uploads/branding/${req.file.filename}?v=${timestamp}`;
 
       await storage.saveAppSetting('branding_favicon', faviconUrl);
 
@@ -709,12 +709,30 @@ function registerAdminRoutes(app: Express) {
         return res.status(404).json({ error: "Company not found" });
       }
 
-      const logoUrl = `/uploads/branding/${req.file.filename}`;
+      const companyUploadDir = path.join(uploadsDir, 'companies', companyId.toString());
+      if (!fs.existsSync(companyUploadDir)) {
+        fs.mkdirSync(companyUploadDir, { recursive: true });
+      }
+
+
+      const fileExtension = path.extname(req.file.filename);
+      const targetFileName = `logo${fileExtension}`;
+      const targetPath = path.join(companyUploadDir, targetFileName);
+      fs.renameSync(req.file.path, targetPath);
+
+      const timestamp = Date.now();
+      const logoUrl = `/uploads/companies/${companyId}/${targetFileName}?v=${timestamp}`;
 
 
       const updatedCompany = await storage.updateCompany(companyId, {
         logo: logoUrl
       });
+
+      try {
+        invalidateSubdomainCache(existingCompany.slug);
+      } catch (error) {
+        console.warn('Cache invalidation failed:', error);
+      }
 
       res.json({
         message: "Company logo uploaded successfully",
@@ -752,7 +770,7 @@ function registerAdminRoutes(app: Express) {
             value: brandingSettings
           });
         } else {
-          console.error('🎨 broadcastToAllClients not available');
+          console.error('broadcastToAllClients not available');
         }
       } catch (error) {
         console.error('Error broadcasting settings update:', error);
@@ -802,14 +820,14 @@ function registerAdminRoutes(app: Express) {
         settings: registrationSettings
       });
     } catch (error) {
-      console.error("❌ Error saving registration settings:", error);
+      console.error("Error saving registration settings:", error);
       res.status(500).json({ error: "Failed to save registration settings" });
     }
   });
 
   app.post("/api/admin/settings/general", ensureSuperAdmin, async (req, res) => {
     try {
-      const { defaultCurrency, dateFormat, timeFormat, subdomainAuthentication, frontendWebsiteEnabled, planRenewalEnabled, helpSupportUrl } = req.body;
+      let { defaultCurrency, dateFormat, timeFormat, subdomainAuthentication, frontendWebsiteEnabled, planRenewalEnabled, helpSupportUrl, customCurrencies } = req.body;
 
 
       if (helpSupportUrl && helpSupportUrl.trim()) {
@@ -820,6 +838,54 @@ function registerAdminRoutes(app: Express) {
         }
       }
 
+      if (customCurrencies !== undefined) {
+        if (!Array.isArray(customCurrencies)) {
+          return res.status(400).json({ error: "customCurrencies must be an array" });
+        }
+
+
+        const builtInCurrencies = ['ARS', 'BRL', 'MXN', 'CLP', 'COP', 'PEN', 'UYU', 'PYG', 'BOB', 'VEF', 'PKR', 'INR', 'USD', 'EUR'];
+        const seenCodes = new Set<string>();
+        
+        for (const currency of customCurrencies) {
+
+          if (!currency.code || !currency.name || !currency.symbol) {
+            return res.status(400).json({ error: "Each custom currency must have code, name, and symbol" });
+          }
+
+
+          const code = String(currency.code).trim().toUpperCase();
+          if (!/^[A-Z]{3}$/.test(code)) {
+            return res.status(400).json({ error: `Invalid currency code format: ${code}. Must be exactly 3 uppercase letters (ISO 4217 format)` });
+          }
+
+
+          if (builtInCurrencies.includes(code)) {
+            return res.status(400).json({ error: `Currency code ${code} conflicts with a built-in default currency. Custom currencies cannot override built-in currencies.` });
+          }
+
+
+          try {
+            new Intl.NumberFormat('en-US', { style: 'currency', currency: code }).format(1);
+          } catch (error) {
+            return res.status(400).json({ error: `Currency code ${code} is not supported by the Intl API. Please use a valid ISO 4217 currency code.` });
+          }
+
+
+          if (seenCodes.has(code)) {
+            return res.status(400).json({ error: `Duplicate currency code found: ${code}` });
+          }
+          seenCodes.add(code);
+        }
+
+
+        customCurrencies = customCurrencies.map((currency: any) => ({
+          code: String(currency.code).trim().toUpperCase(),
+          name: String(currency.name).trim(),
+          symbol: String(currency.symbol).trim()
+        }));
+      }
+
       const generalSettings = {
         defaultCurrency: defaultCurrency || 'USD',
         dateFormat: dateFormat || 'MM/DD/YYYY',
@@ -827,7 +893,8 @@ function registerAdminRoutes(app: Express) {
         subdomainAuthentication: Boolean(subdomainAuthentication),
         frontendWebsiteEnabled: frontendWebsiteEnabled !== undefined ? Boolean(frontendWebsiteEnabled) : false,
         planRenewalEnabled: planRenewalEnabled !== undefined ? Boolean(planRenewalEnabled) : true,
-        helpSupportUrl: helpSupportUrl ? helpSupportUrl.trim() : ''
+        helpSupportUrl: helpSupportUrl ? helpSupportUrl.trim() : '',
+        customCurrencies: customCurrencies || []
       };
 
       await storage.saveAppSetting('general_settings', generalSettings);
@@ -892,64 +959,7 @@ function registerAdminRoutes(app: Express) {
       }
 
 
-
-
-
-
-      const allowedDomains = [
-        'cdn.jsdelivr.net',
-        'cdnjs.cloudflare.com',
-        'unpkg.com',
-        'code.jquery.com',
-        'stackpath.bootstrapcdn.com',
-        'maxcdn.bootstrapcdn.com',
-        'ajax.googleapis.com',
-        'fonts.googleapis.com',
-        'fonts.gstatic.com',
-        'www.googletagmanager.com',
-        'www.google-analytics.com',
-        'connect.facebook.net',
-        'platform.twitter.com',
-        'www.youtube.com',
-        'player.vimeo.com',
-        'cdn.weglot.com',
-        'widget.intercom.io',
-        'js.stripe.com',
-        'checkout.stripe.com',
-        'js.paypal.com',
-        'www.paypal.com',
-        'sdk.mercadopago.com',
-        'secure.mlstatic.com',
-        'embed.tawk.to',
-        'tawk.to'
-      ];
-
-
       const srcMatches = scripts.match(/src\s*=\s*["']([^"']+)["']/gi);
-      if (srcMatches) {
-        for (const match of srcMatches) {
-          const urlMatch = match.match(/src\s*=\s*["']([^"']+)["']/i);
-          if (urlMatch) {
-            const url = urlMatch[1];
-            try {
-              const urlObj = new URL(url);
-              const domain = urlObj.hostname;
-
-              if (!allowedDomains.some(allowedDomain =>
-                domain === allowedDomain || domain.endsWith('.' + allowedDomain)
-              )) {
-                return res.status(400).json({
-                  error: `Domain '${domain}' is not in the allowed list for security reasons`,
-                  details: `Please contact your administrator to whitelist this domain if it's trusted`
-                });
-              }
-            } catch (e) {
-
-
-            }
-          }
-        }
-      }
 
       const customScriptsSettings = {
         enabled: Boolean(enabled),
@@ -991,7 +1001,7 @@ function registerAdminRoutes(app: Express) {
           enabled: false,
           host: '',
           port: 465,
-          security: 'starttls',
+          security: 'ssl',
           username: '',
           password: '',
           fromName: '',
@@ -1528,7 +1538,7 @@ function registerAdminRoutes(app: Express) {
 
   app.post("/api/admin/settings/payment/mpesa", ensureSuperAdmin, async (req, res) => {
     try {
-      const { consumerKey, consumerSecret, businessShortcode, passkey, testMode } = req.body;
+      const { consumerKey, consumerSecret, businessShortcode, passkey, testMode, shortcodeType, callbackUrl } = req.body;
 
       if (!consumerKey || !consumerSecret || !businessShortcode || !passkey) {
         return res.status(400).json({ error: "Consumer Key, Consumer Secret, Business Shortcode, and Passkey are required" });
@@ -1539,6 +1549,8 @@ function registerAdminRoutes(app: Express) {
         consumerSecret,
         businessShortcode,
         passkey,
+        shortcodeType: shortcodeType === 'buygoods' ? 'buygoods' : 'paybill',
+        callbackUrl: typeof callbackUrl === 'string' ? callbackUrl : '',
         testMode: !!testMode,
         enabled: true
       };
@@ -1548,9 +1560,7 @@ function registerAdminRoutes(app: Express) {
       res.json({
         message: "MPESA settings saved successfully",
         settings: {
-          ...mpesaSettings,
-          consumerSecret: '••••••••',
-          passkey: '••••••••'
+          ...mpesaSettings
         }
       });
     } catch (error) {
@@ -2800,13 +2810,22 @@ function registerAdminRoutes(app: Express) {
     try {
       const { description, storage_locations } = req.body;
 
+      const { storageProviderRegistry } = await import('./services/storage-providers/storage-provider-registry');
+      const locationsToValidate = storage_locations || ['local'];
+      const validation = storageProviderRegistry.validateStorageLocations(locationsToValidate);
+      if (!validation.valid) {
+        return res.status(400).json({
+          error: `Invalid storage providers: ${validation.invalidProviders.join(', ')}. Available providers: ${storageProviderRegistry.getProviderNames().join(', ')}`
+        });
+      }
+
       const { BackupService } = await import('./services/backup-service');
       const backupService = new BackupService();
 
       const backup = await backupService.createBackup({
         type: 'manual',
         description: description || 'Manual backup',
-        storage_locations: storage_locations || ['local']
+        storage_locations: locationsToValidate
       });
 
       res.json(backup);
@@ -2848,32 +2867,77 @@ function registerAdminRoutes(app: Express) {
     }
   });
 
+  app.get("/api/admin/backup/restore-preflight/:id", ensureSuperAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { BackupService } = await import('./services/backup-service');
+      const backupService = new BackupService();
+
+      const result = await backupService.preflightRestoreChecks(id);
+      res.json(result);
+    } catch (error) {
+      console.error("Error performing preflight checks:", error);
+      res.status(500).json({
+        error: "Failed to perform preflight checks",
+        details: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
   app.post("/api/admin/backup/restore/:id", ensureSuperAdmin, async (req, res) => {
     try {
       const { id } = req.params;
-      const { confirmationText } = req.body;
+      const { confirmationText, dropDatabase } = req.body;
       const { BackupService } = await import('./services/backup-service');
       const backupService = new BackupService();
 
       const user = (req as any).user;
 
-
+      if (dropDatabase !== undefined && typeof dropDatabase !== 'boolean') {
+        return res.status(400).json({
+          error: 'dropDatabase must be a boolean value'
+        });
+      }
 
       const result = await backupService.restoreBackup(id, {
         userId: user?.id,
         userEmail: user?.email,
-        confirmationText
+        confirmationText,
+        dropDatabase: dropDatabase === true
       });
 
 
-      res.json(result);
+      if (!res.headersSent) {
+        res.json(result);
+      }
     } catch (error) {
       console.error("Error restoring backup:", error);
       const errorMessage = error instanceof Error ? error.message : "Failed to restore backup";
-      res.status(500).json({
-        error: errorMessage,
-        details: error instanceof Error ? error.stack : String(error)
-      });
+      if (!res.headersSent) {
+        res.status(500).json({
+          error: errorMessage,
+          details: error instanceof Error ? error.stack : String(error)
+        });
+      }
+    }
+  });
+
+  app.get("/api/admin/backup/restore/:restoreId/status", ensureSuperAdmin, async (req, res) => {
+    try {
+      const { restoreId } = req.params;
+      const { BackupService } = await import('./services/backup-service');
+      const backupService = new BackupService();
+
+      const status = backupService.getRestoreStatus(restoreId);
+
+      if (!status) {
+        return res.status(404).json({ error: "Restore status not found" });
+      }
+
+      res.json(status);
+    } catch (error) {
+      console.error("Error fetching restore status:", error);
+      res.status(500).json({ error: "Failed to fetch restore status" });
     }
   });
 
@@ -2905,6 +2969,80 @@ function registerAdminRoutes(app: Express) {
     }
   });
 
+  app.post("/api/admin/backup/verify-deep/:id", ensureSuperAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { BackupService } = await import('./services/backup-service');
+      const backupService = new BackupService();
+
+      const result = await backupService.verifyDeep(id);
+      res.json(result);
+    } catch (error) {
+      console.error("Error performing deep verification:", error);
+      res.status(500).json({
+        error: "Failed to perform deep verification",
+        details: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  app.post("/api/admin/backup/cleanup", ensureSuperAdmin, async (req, res) => {
+    try {
+      const { BackupService } = await import('./services/backup-service');
+      const backupService = new BackupService();
+
+
+      const config = await storage.getAppSetting('backup_config');
+      const retentionDays = (config?.value as any)?.retention_days || 30;
+
+      const result = await backupService.cleanupOldBackups(retentionDays);
+
+      res.json({
+        message: `Cleanup completed: ${result.deleted} backups deleted`,
+        deleted: result.deleted,
+        deletedBackups: result.deletedBackups,
+        errors: result.errors,
+        retentionDays
+      });
+    } catch (error) {
+      console.error("Error performing backup cleanup:", error);
+      res.status(500).json({
+        error: "Failed to perform backup cleanup",
+        details: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  app.get("/api/admin/backup/logs", ensureSuperAdmin, async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = parseInt(req.query.offset as string) || 0;
+
+
+      const logs = await db
+        .select()
+        .from(databaseBackupLogs)
+        .orderBy(desc(databaseBackupLogs.timestamp))
+        .limit(limit)
+        .offset(offset);
+
+
+      const countResult = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(databaseBackupLogs);
+      const totalCount = Number(countResult[0]?.count || 0);
+
+      res.json({
+        logs,
+        total: totalCount,
+        limit,
+        offset
+      });
+    } catch (error) {
+      console.error("Error fetching backup logs:", error);
+      res.status(500).json({ error: "Failed to fetch backup logs" });
+    }
+  });
 
   const backupUploadStorage = multer.diskStorage({
     destination: (_req, _file, cb) => {
@@ -2931,7 +3069,7 @@ function registerAdminRoutes(app: Express) {
   const backupUpload = multer({
     storage: backupUploadStorage,
     limits: {
-      fileSize: 3000 * 1024 * 1024, // 300MB limit for backup files
+      fileSize: 3000 * 1024 * 1024, // 3000MB limit for backup files
       files: 1
     },
     fileFilter: (_req, file, cb) => {
@@ -3147,7 +3285,7 @@ function registerAdminRoutes(app: Express) {
 
 
       const contentLength = response.headers['content-length'];
-      if (contentLength && parseInt(contentLength) > 500 * 1024 * 1024) {
+      if (contentLength && parseInt(contentLength) > 3000 * 1024 * 1024) {
         return res.status(400).json({ error: "File size exceeds 3000MB limit" });
       }
 
@@ -3355,8 +3493,18 @@ function registerAdminRoutes(app: Express) {
     }
   });
 
+  app.get("/api/admin/backup/tools", ensureSuperAdmin, async (_req, res) => {
+    try {
+      const { BackupService } = await import('./services/backup-service');
+      const backupService = new BackupService();
 
-
+      const tools = await backupService.checkPostgresTools();
+      res.json(tools);
+    } catch (error) {
+      console.error("Error checking PostgreSQL tools:", error);
+      res.status(500).json({ error: "Failed to check PostgreSQL tools" });
+    }
+  });
 
   app.get('/api/admin/partner-configurations/:provider', ensureSuperAdmin, async (req: Request, res: Response) => {
     try {
@@ -3401,7 +3549,7 @@ function registerAdminRoutes(app: Express) {
 
 
   app.post('/api/admin/partner-configurations/validate', ensureSuperAdmin, async (req: Request, res: Response) => {
-    const { provider, partnerApiKey, partnerId } = req.body;
+    const { provider, partnerApiKey, partnerId, appId, appSecret, businessManagerId, accessToken } = req.body;
 
     try {
 
@@ -3413,13 +3561,6 @@ function registerAdminRoutes(app: Express) {
             error: 'Partner API Key and Partner ID are required'
           });
         }
-
-        console.log('Validating 360Dialog Partner credentials:', {
-          partnerId,
-          apiKeyLength: partnerApiKey?.length || 0,
-          apiKeyPrefix: partnerApiKey?.substring(0, 8) + '...'
-        });
-
 
         const response = await axios.get(`https://hub.360dialog.io/api/v2/partners/${partnerId}`, {
           headers: {
@@ -3457,8 +3598,6 @@ function registerAdminRoutes(app: Express) {
         }
       } else if (provider === 'meta') {
 
-        const { appId, appSecret, businessManagerId, accessToken } = req.body;
-
         if (!appId || !appSecret || !businessManagerId) {
           return res.status(400).json({ valid: false, error: 'App ID, App Secret, and Business Manager ID are required' });
         }
@@ -3487,14 +3626,6 @@ function registerAdminRoutes(app: Express) {
             error: 'Client Key and Client Secret are required'
           });
         }
-
-        console.log('Validating TikTok credentials:', {
-          clientKeyLength: clientKey?.length || 0,
-          clientKeyPrefix: clientKey?.substring(0, 8) + '...'
-        });
-
-
-
 
         try {
 
@@ -3670,12 +3801,6 @@ function registerAdminRoutes(app: Express) {
           error: 'Client Key and Client Secret are required'
         });
       }
-
-      console.log('Validating TikTok credentials:', {
-        clientKeyLength: clientKey?.length || 0,
-        clientKeyPrefix: clientKey?.substring(0, 8) + '...'
-      });
-
 
       if (clientKey.length < 10 || clientSecret.length < 10) {
         return res.status(400).json({

@@ -1,7 +1,7 @@
 import { storage } from '../storage';
 import { eq, and, lte, gte, desc, asc, sql } from 'drizzle-orm';
-import { scheduledMessages } from '@shared/schema';
-import { ChannelConnection } from '@shared/schema';
+import { scheduledMessages } from '@shared/db/schema';
+import { ChannelConnection } from '@shared/db/schema';
 
 export interface ScheduledMessageData {
   companyId: number;

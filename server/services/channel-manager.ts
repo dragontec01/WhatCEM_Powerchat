@@ -7,6 +7,8 @@ import messengerService from './channels/messenger';
 import instagramService from './channels/instagram';
 import TikTokService from './channels/tiktok';
 import emailService from './channels/email';
+import twilioSmsService from './channels/twilio-sms';
+import webchatService from './channels/webchat';
 import { Message } from '@shared/db/schema';
 
 export interface ChannelCapabilities {
@@ -106,6 +108,22 @@ class ChannelManager {
           replyFormat: 'threaded'
         };
 
+      case 'twilio_sms':
+        return {
+          supportsReply: true,
+          supportsDelete: false,
+          supportsQuotedMessages: false,
+          replyFormat: 'threaded'
+        };
+
+      case 'webchat':
+        return {
+          supportsReply: true,
+          supportsDelete: false,
+          supportsQuotedMessages: false,
+          replyFormat: 'threaded'
+        };
+
       default:
         return {
           supportsReply: false,
@@ -176,18 +194,33 @@ class ChannelManager {
 
       let messageContent = content;
       try {
-        const user = await storage.getUser(userId);
-        if (user) {
-          const nameCandidates = [
-            (user as any).fullName,
-            (user as any).name,
-            [ (user as any).firstName, (user as any).lastName ].filter(Boolean).join(' ').trim(),
-            (user as any).displayName,
-            typeof (user as any).email === 'string' ? (user as any).email.split('@')[0] : undefined
-          ].filter((v: any) => typeof v === 'string' && v.trim().length > 0);
-          const signatureName = nameCandidates[0];
-          if (signatureName) {
-            messageContent = `> *${signatureName}*\n\n${content}`;
+
+        let agentSignatureEnabled = true; // Default to enabled
+
+        if (conversation.companyId) {
+          const agentSignatureSetting = await storage.getCompanySetting(
+            conversation.companyId,
+            'inbox_agent_signature_enabled'
+          );
+          agentSignatureEnabled = agentSignatureSetting?.value !== undefined && agentSignatureSetting?.value !== null
+            ? Boolean(agentSignatureSetting.value)
+            : true;
+        }
+
+        if (agentSignatureEnabled) {
+          const user = await storage.getUser(userId);
+          if (user) {
+            const nameCandidates = [
+              (user as any).fullName,
+              (user as any).name,
+              [ (user as any).firstName, (user as any).lastName ].filter(Boolean).join(' ').trim(),
+              (user as any).displayName,
+              typeof (user as any).email === 'string' ? (user as any).email.split('@')[0] : undefined
+            ].filter((v: any) => typeof v === 'string' && v.trim().length > 0);
+            const signatureName = nameCandidates[0];
+            if (signatureName) {
+              messageContent = `> *${signatureName}*\n\n${content}`;
+            }
           }
         }
       } catch (userError) {
@@ -288,6 +321,33 @@ class ChannelManager {
             userId,
             recipient,
             messageContent,
+            replyOptions
+          );
+
+        case 'twilio_sms':
+          if (conversation.isGroup) {
+            return { success: false, error: 'SMS does not support group chat replies' };
+          }
+          try {
+            const message = await twilioSmsService.sendMessage(
+              conversation.channelId,
+              userId,
+              recipient,
+              content
+            );
+            return { success: true, messageId: message.id?.toString(), data: message };
+          } catch (err: any) {
+            return { success: false, error: err?.message || 'Failed to send SMS reply' };
+          }
+
+        case 'webchat':
+          if (conversation.isGroup) {
+            return { success: false, error: 'WebChat does not support group chat replies' };
+          }
+          return await this.sendWebChatReply(
+            conversation.channelId,
+            recipient,
+            content,
             replyOptions
           );
 
@@ -615,6 +675,20 @@ class ChannelManager {
         messageId: result.id?.toString(),
         data: result
       };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  private async sendWebChatReply(
+    connectionId: number,
+    sessionId: string,
+    content: string,
+    replyOptions: ReplyOptions
+  ): Promise<ChannelServiceResult> {
+    try {
+      const message = await webchatService.sendMessage(connectionId, sessionId, content);
+      return { success: true, messageId: message?.id?.toString(), data: message };
     } catch (error: any) {
       return { success: false, error: error.message };
     }
