@@ -36,7 +36,7 @@ jobs:
       - name: Create deployment archive
         run: |
           # Create a tarball containing dist and package files
-          tar -czf dist.tar.gz dist/ package.json package-lock.json
+          tar -czf dist.tar.gz dist/ package.json package-lock.json migrations/
       
       - name: Test SSH connection
         uses: appleboy/ssh-action@v1.2.4
