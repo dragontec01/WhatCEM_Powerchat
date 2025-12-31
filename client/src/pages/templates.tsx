@@ -48,27 +48,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { CreateTemplateModal, EditTemplateModal, ViewTemplateModal } from '@/components/templates';
-
-interface WhatsAppTemplate {
-  id: number;
-  name: string;
-  description?: string;
-  content: string;
-  category: string;
-  whatsappTemplateCategory?: 'marketing' | 'utility' | 'authentication';
-  whatsappTemplateStatus?: 'pending' | 'approved' | 'rejected' | 'disabled';
-  whatsappTemplateId?: string;
-  whatsappTemplateName?: string;
-  whatsappTemplateLanguage?: string;
-  variables: string[];
-  mediaUrls?: string[];
-  whatsappChannelType: 'official' | 'unofficial';
-  isActive: boolean;
-  usageCount: number;
-  createdAt: string;
-  updatedAt: string;
-  rejectionReason?: string;
-}
+import type { WhatsAppTemplate } from '@/types/whatsapp-template';
 
 export default function Templates() {
   const { t } = useTranslation();

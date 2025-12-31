@@ -49,7 +49,7 @@ Arguments:
 
 Customizations performed:
     admin@powerchatapp.net → ADMIN_EMAIL from .env
-    PowerChat              → COMPANY_NAME from .env
+    BotHive              → COMPANY_NAME from .env
 
 Examples:
     $0 cbl
@@ -97,7 +97,7 @@ load_instance_env() {
     
     if [ -z "$COMPANY_NAME" ]; then
         print_warning "COMPANY_NAME not found in .env file, using default"
-        COMPANY_NAME="PowerChat"
+        COMPANY_NAME="BotHive"
     fi
     
     print_status "Loaded configuration:"
@@ -151,12 +151,12 @@ customize_migration_file() {
     print_status "Replacing 'admin@powerchatapp.net' with '$admin_email'..."
     sed -i "s/admin@powerchatapp\\.net/${escaped_admin_email}/g" "$target_file"
     
-    print_status "Replacing 'PowerChat' with '$company_name'..."
-    sed -i "s/PowerChat/${escaped_company_name}/g" "$target_file"
+    print_status "Replacing 'BotHive' with '$company_name'..."
+    sed -i "s/BotHive/${escaped_company_name}/g" "$target_file"
     
     # Verify replacements
     local admin_placeholders=$(grep -c "admin@powerchatapp\.net" "$target_file" 2>/dev/null || echo "0")
-    local company_placeholders=$(grep -c "PowerChat" "$target_file" 2>/dev/null || echo "0")
+    local company_placeholders=$(grep -c "BotHive" "$target_file" 2>/dev/null || echo "0")
     
     if [ "$admin_placeholders" -eq 0 ]; then
         print_success "✓ All admin email placeholders replaced"

@@ -102,7 +102,6 @@ export function useMediaCache(options: MediaCacheOptions = {}) {
 
   /**
    * Preload media for better user experience
-   * Note: Caching is disabled to prevent browser cache issues with new media
    */
   const preloadMedia = useCallback(async (url: string, type: 'image' | 'video' | 'audio' | 'document'): Promise<void> => {
     if (!enabled) return;
@@ -168,8 +167,13 @@ export function useMediaCache(options: MediaCacheOptions = {}) {
 
     messages.forEach(message => {
       if (message.mediaUrl && message.type && message.type !== 'text') {
-        const mediaType = message.type as 'image' | 'video' | 'audio' | 'document';
-        mediaItems.push({ url: message.mediaUrl, type: mediaType });
+        const mediaUrlAge = message.mediaUrlFetchedAt ? Date.now() - message.mediaUrlFetchedAt : Infinity;
+        const isStale = mediaUrlAge > (24 * 60 * 60 * 1000);
+        
+        if (!isStale) {
+          const mediaType = message.type as 'image' | 'video' | 'audio' | 'document';
+          mediaItems.push({ url: message.mediaUrl, type: mediaType });
+        }
       }
     });
 
@@ -236,9 +240,46 @@ export function useMediaCache(options: MediaCacheOptions = {}) {
   const warmupConversationMedia = useCallback(async (messages: any[]): Promise<void> => {
     if (!enabled) return;
 
-
     await preloadMessagesMedia(messages);
   }, [enabled, preloadMessagesMedia]);
+
+  /**
+   * Validate if a media URL is still accessible
+   */
+  const validateMediaUrl = useCallback(async (url: string): Promise<boolean> => {
+    if (!enabled) return true;
+
+    try {
+      const response = await fetch(url, {
+        method: 'HEAD',
+        cache: 'no-cache'
+      });
+      return response.ok;
+    } catch (error) {
+      return false;
+    }
+  }, [enabled]);
+
+  /**
+   * Get the age of a media URL from cache
+   */
+  const getMediaUrlAge = useCallback(async (messageId: number): Promise<number | null> => {
+    if (!enabled) return null;
+
+    try {
+      await initializeCache();
+      const transaction = messageCacheService['getTransaction'](['messages'], 'readonly');
+      const store = transaction.objectStore('messages');
+      const message = await messageCacheService['executeRequest'](store.get(messageId));
+      
+      if (message && message.mediaUrlFetchedAt) {
+        return Date.now() - message.mediaUrlFetchedAt;
+      }
+      return null;
+    } catch (error) {
+      return null;
+    }
+  }, [enabled, initializeCache]);
 
   return {
     cacheMediaMetadata,
@@ -251,6 +292,8 @@ export function useMediaCache(options: MediaCacheOptions = {}) {
     clearMediaCache,
     getMediaCacheStats,
     warmupConversationMedia,
+    validateMediaUrl,
+    getMediaUrlAge,
     isEnabled: enabled
   };
 }

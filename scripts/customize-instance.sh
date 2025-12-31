@@ -49,7 +49,7 @@ Arguments:
 
 Replacements performed:
     admin@powerchatapp.net → ADMIN_EMAIL from .env
-    PowerChat              → COMPANY_NAME from .env
+    BotHive              → COMPANY_NAME from .env
 
 Examples:
     $0 cbl
@@ -133,7 +133,7 @@ customize_container() {
     
     # Define replacement commands
     local admin_email_replacement="s/admin@powerchatapp\\.net/${escaped_admin_email}/g"
-    local company_name_replacement="s/PowerChat/${escaped_company_name}/g"
+    local company_name_replacement="s/BotHive/${escaped_company_name}/g"
     
     print_status "Replacing 'admin@powerchatapp.net' with '$admin_email'..."
     
@@ -145,7 +145,7 @@ customize_container() {
     docker exec "$container_name" find /app/client/dist -type f \( -name "*.js" -o -name "*.html" -o -name "*.css" \) \
         -exec sed -i "$admin_email_replacement" {} \; 2>/dev/null || true
     
-    print_status "Replacing 'PowerChat' with '$company_name'..."
+    print_status "Replacing 'BotHive' with '$company_name'..."
     
     # Replace in server-side built files
     docker exec "$container_name" find /app/dist -type f \( -name "*.js" -o -name "*.html" -o -name "*.css" \) \
@@ -191,7 +191,7 @@ verify_replacements() {
         -exec grep -l "admin@powerchatapp\.net" {} \; 2>/dev/null | wc -l)
     
     local remaining_company_placeholders=$(docker exec "$container_name" find /app/dist -type f \( -name "*.js" -o -name "*.html" -o -name "*.css" \) \
-        -exec grep -l "PowerChat" {} \; 2>/dev/null | wc -l)
+        -exec grep -l "BotHive" {} \; 2>/dev/null | wc -l)
     
     if [ "$remaining_admin_placeholders" -eq 0 ]; then
         print_success "All admin email placeholders replaced"
@@ -202,7 +202,7 @@ verify_replacements() {
     if [ "$remaining_company_placeholders" -eq 0 ]; then
         print_success "All company name placeholders replaced"
     else
-        print_warning "$remaining_company_placeholders files still contain 'PowerChat'"
+        print_warning "$remaining_company_placeholders files still contain 'BotHive'"
     fi
     
     # Check for successful replacements

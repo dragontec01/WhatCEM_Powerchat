@@ -469,6 +469,17 @@ async function findOrCreateConversation(connectionId: number, recipientId: strin
     };
 
     conversation = await storage.createConversation(conversationData);
+
+    if ((global as any).broadcastToCompany) {
+      (global as any).broadcastToCompany({
+        type: 'newConversation',
+        data: {
+          ...conversation,
+          contact
+        }
+      }, companyId);
+
+    }
   }
 
   return conversation;
@@ -1642,26 +1653,8 @@ export async function processWebhook(body: any, signature?: string, companyId?: 
   const webhookId = `webhook_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   
   try {
-    console.log('🚀 [MESSENGER WEBHOOK] Processing webhook:', webhookId, {
-      hasEntry: !!body.entry,
-      entryCount: body.entry?.length || 0,
-      firstEntryHasMessaging: !!(body.entry?.[0]?.messaging),
-      messagingCount: body.entry?.[0]?.messaging?.length || 0,
-      payloadSize: JSON.stringify(body).length,
-      companyId,
-      targetConnectionId: targetConnection?.id,
-      bodyPreview: JSON.stringify(body).substring(0, 500)
-    });
     
-    logger.debug('messenger', `Processing webhook ${webhookId}`, {
-      hasEntry: !!body.entry,
-      entryCount: body.entry?.length || 0,
-      firstEntryHasMessaging: !!(body.entry?.[0]?.messaging),
-      messagingCount: body.entry?.[0]?.messaging?.length || 0,
-      payloadSize: JSON.stringify(body).length,
-      companyId,
-      targetConnectionId: targetConnection?.id
-    });
+    logger.debug('messenger', `Processing webhook ${webhookId}`);
 
 
     if (body['hub.mode'] === 'subscribe' && body['hub.verify_token']) {
@@ -1738,11 +1731,6 @@ async function handleIncomingMessengerMessage(messagingEvent: any, companyId?: n
   let connection: any = null;
 
   try {
-    console.log('🔍 [MESSENGER DEBUG] Starting message processing:', {
-      messagingEvent: JSON.stringify(messagingEvent, null, 2),
-      companyId,
-      targetConnectionId: targetConnection?.id
-    });
 
     logger.debug('messenger', 'Processing incoming Messenger message event');
 
@@ -1753,12 +1741,6 @@ async function handleIncomingMessengerMessage(messagingEvent: any, companyId?: n
 
 
     if (message?.is_echo) {
-      console.log('🔄 [MESSENGER DEBUG] Skipping echo message (sent by us):', {
-        senderId,
-        recipientId,
-        messageId: message.mid,
-        text: message.text?.substring(0, 50) + (message.text?.length > 50 ? '...' : '')
-      });
       logger.debug('messenger', 'Skipping echo message processing');
       return;
     }
@@ -1772,11 +1754,6 @@ async function handleIncomingMessengerMessage(messagingEvent: any, companyId?: n
 
 
     if (!message && !postback) {
-      console.log('⚠️ [MESSENGER DEBUG] No message or postback content, skipping:', {
-        senderId,
-        recipientId,
-        eventKeys: Object.keys(messagingEvent)
-      });
       logger.debug('messenger', 'No message or postback content to process');
       return;
     }
@@ -1793,20 +1770,12 @@ async function handleIncomingMessengerMessage(messagingEvent: any, companyId?: n
 
 
     if (targetConnection) {
-      console.log('🎯 Using target connection from webhook routing:', {
-        id: targetConnection.id,
-        companyId: targetConnection.companyId,
-        pageId: (targetConnection.connectionData as MessengerConnectionData)?.pageId
-      });
+      logger.info('messenger', 'Using provided target connection for message processing');
       connection = targetConnection;
     } else {
 
       const connections = await storage.getChannelConnectionsByType('messenger');
-      console.log('📋 Available connections:', connections.map(c => ({
-        id: c.id,
-        pageId: (c.connectionData as MessengerConnectionData)?.pageId,
-        companyId: c.companyId
-      })));
+      logger.debug('messenger', `Found ${connections.length} Messenger connections for message routing`);
 
       connection = connections.find((conn: any) => {
         const connectionData = conn.connectionData as MessengerConnectionData;
@@ -1814,19 +1783,11 @@ async function handleIncomingMessengerMessage(messagingEvent: any, companyId?: n
       });
 
       if (!connection) {
-        console.log('❌ [MESSENGER DEBUG] No connection found for page ID:', {
-          recipientId,
-          availablePageIds: connections.map(c => (c.connectionData as MessengerConnectionData)?.pageId)
-        });
         logger.warn('messenger', `No Messenger connection found for page ID: ${recipientId}`);
         return;
       }
 
-      console.log('✅ [MESSENGER DEBUG] Found connection:', {
-        connectionId: connection.id,
-        companyId: connection.companyId,
-        pageId: (connection.connectionData as MessengerConnectionData)?.pageId
-      });
+      logger.debug('messenger', `Routed message to connection ID: ${connection.id}`);
 
 
     }
@@ -1986,7 +1947,15 @@ async function handleIncomingMessengerMessage(messagingEvent: any, companyId?: n
 
       conversation = await storage.createConversation(insertConversationData);
 
-    } else {
+      if ((global as any).broadcastToCompany) {
+        (global as any).broadcastToCompany({
+          type: 'newConversation',
+          data: {
+            ...conversation,
+            contact
+          }
+        }, connection.companyId);
+      }
 
     }
 
@@ -2152,10 +2121,7 @@ export async function testWebhookConfiguration(
   verifyToken: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    console.log('🧪 [WEBHOOK TEST] Starting webhook test:', {
-      webhookUrl,
-      verifyToken: verifyToken ? `${verifyToken.substring(0, 8)}...` : 'undefined'
-    });
+    logger.info('messenger', 'Testing webhook configuration:', { webhookUrl });
 
     const url = new URL(webhookUrl);
     if (url.protocol !== 'https:') {
@@ -2173,9 +2139,8 @@ export async function testWebhookConfiguration(
       'hub.challenge': challenge
     });
 
-    console.log('📡 [WEBHOOK TEST] Making test request:', {
-      url: `${webhookUrl}?${testParams.toString()}`,
-      expectedChallenge: challenge
+    logger.info('messenger', 'Sending test webhook verification request to:', {
+      url: `${webhookUrl}?${testParams.toString()}`
     });
 
     const testResponse = await axios.get(`${webhookUrl}?${testParams.toString()}`, {

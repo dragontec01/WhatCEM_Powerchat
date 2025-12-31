@@ -15,6 +15,7 @@ import {
   Download
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { useCurrency } from "@/contexts/currency-context";
 import { OpenAIIcon } from "@/components/ui/openai-icon";
 import { AnthropicIcon } from "@/components/ui/anthropic-icon";
 import { XAIIcon } from "@/components/ui/xai-icon";
@@ -55,6 +56,7 @@ const AI_PROVIDER_COLORS: Record<string, string> = {
 };
 
 export default function AiUsageAnalytics({ planId, companyId, showSystemOverview = false }: AiUsageAnalyticsProps) {
+  const { formatCurrency } = useCurrency();
   const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d' | 'all'>('30d');
 
 
@@ -118,15 +120,6 @@ export default function AiUsageAnalytics({ planId, companyId, showSystemOverview
     if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
     if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
     return num.toLocaleString();
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 6
-    }).format(amount);
   };
 
   const getProviderDisplayName = (provider: string) => {

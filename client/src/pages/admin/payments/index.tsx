@@ -17,8 +17,9 @@ import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, DollarSign, TrendingUp, Users, AlertCircle, Download, Mail, CheckCircle, Eye, Calendar, CreditCard, Edit, Copy } from "lucide-react";
-import { formatCurrency, formatDate } from "@/lib/utils";
-import { ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Bar, PieChart, Pie, Cell } from 'recharts';
+import { formatDate } from "@/lib/utils";
+import { useCurrency } from "@/contexts/currency-context";
+import { ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Bar, PieChart, Pie, Cell, PieLabelRenderProps } from 'recharts';
 
 interface PaymentMetrics {
   totalRevenue: number;
@@ -96,6 +97,7 @@ export default function PaymentsPage() {
   const { t } = useTranslation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { formatCurrency } = useCurrency();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -1106,17 +1108,19 @@ export default function PaymentsPage() {
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
                             <Pie
-                              data={performance}
+                              data={performance as unknown as (Record<string, any> & PaymentMethodPerformance)[]}
                               dataKey="totalRevenue"
                               nameKey="paymentMethod"
                               cx="50%"
                               cy="50%"
                               outerRadius="60%"
                               fill="#8884d8"
-                              label={({ paymentMethod, percent }) =>
-                                window.innerWidth >= 640
-                                  ? `${paymentMethod}: ${(percent * 100).toFixed(0)}%`
-                                  : `${(percent * 100).toFixed(0)}%`
+                              label={(props) =>{
+                                  const { paymentMethod, percent } = props as PieLabelRenderProps & PaymentMethodPerformance
+                                  return window.innerWidth >= 640
+                                    ? `${paymentMethod}: ${((percent as number) * 100).toFixed(0)}%`
+                                    : `${((percent as number) * 100).toFixed(0)}%`
+                                }
                               }
                               labelLine={false}
                             >

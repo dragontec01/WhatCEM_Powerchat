@@ -27,9 +27,10 @@ export function InboxSettings() {
   const { t } = useTranslation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { showGroupChats, updateGroupChatSetting, browserNotifications, updateBrowserNotificationSetting } = useConversations();
+  const { showGroupChats, updateGroupChatSetting, browserNotifications, updateBrowserNotificationSetting, agentSignatureEnabled, updateAgentSignatureSetting } = useConversations();
   const [isUpdating, setIsUpdating] = useState(false);
   const [isUpdatingNotifications, setIsUpdatingNotifications] = useState(false);
+  const [isUpdatingAgentSignature, setIsUpdatingAgentSignature] = useState(false);
   const [notificationPermission, setNotificationPermission] = useState(getNotificationPermission());
   const { data: channelConnections } = useChannelConnections();
 
@@ -93,6 +94,17 @@ export function InboxSettings() {
       console.error('Error updating browser notification setting:', error);
     } finally {
       setIsUpdatingNotifications(false);
+    }
+  };
+
+  const handleAgentSignatureToggle = async (enabled: boolean) => {
+    setIsUpdatingAgentSignature(true);
+    try {
+      await updateAgentSignatureSetting(enabled);
+    } catch (error) {
+      console.error('Error updating agent signature setting:', error);
+    } finally {
+      setIsUpdatingAgentSignature(false);
     }
   };
 
@@ -201,6 +213,25 @@ export function InboxSettings() {
                 </div>
               </Alert>
             )}
+
+            {/* Agent Signature Setting */}
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <Label htmlFor="agent-signature" className="text-base font-medium flex items-center gap-2">
+                  <i className="ri-user-line text-base"></i>
+                  {t('settings.inbox.agent_signature', 'Agent Signature')}
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  {t('settings.inbox.agent_signature_description', 'Automatically add agent name to outbound messages')}
+                </p>
+              </div>
+              <Switch
+                id="agent-signature"
+                checked={agentSignatureEnabled}
+                onCheckedChange={handleAgentSignatureToggle}
+                disabled={isUpdatingAgentSignature}
+              />
+            </div>
           </div>
 
         </CardContent>
@@ -339,100 +370,4 @@ function WhatsAppHistorySyncSettings() {
   if (whatsappConnections.length === 0) {
     return null;
   }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 }

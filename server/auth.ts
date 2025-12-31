@@ -7,9 +7,10 @@ import { promisify } from "util";
 import { storage } from "./storage";
 import { User as SelectUser, Company } from "@shared/db/schema";
 import connectPg from "connect-pg-simple";
-import { pool } from "./db";
+import { getPool } from "./db";
 import { createAffiliateReferral } from "./middleware/affiliate-tracking";
 import { subdomainMiddleware, requireSubdomainAuth } from "./middleware/subdomain";
+import { logger } from "./utils/logger";
 
 declare global {
   namespace Express {
@@ -91,13 +92,22 @@ export async function setupAuth(app: Express) {
   const forceInsecure = process.env.FORCE_INSECURE_COOKIE === 'true';
   const sessionSecret = process.env.SESSION_SECRET || 'powerchat-secret';
 
+  const poolProxy = new Proxy({} as any, {
+    get(_target, prop) {
+      return (getPool() as any)[prop];
+    },
+    set(_target, prop, value) {
+      (getPool() as any)[prop] = value;
+      return true;
+    }
+  });
 
   const sessionSettings: session.SessionOptions = {
     secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
     store: new PostgresSessionStore({
-      pool,
+      pool: poolProxy,
       createTableIfMissing: true,
     }),
     cookie: {
@@ -171,6 +181,7 @@ export async function setupAuth(app: Express) {
 
   const ensureCompanyUser = async (req: Request, res: Response, next: NextFunction) => {
     if (!req.isAuthenticated()) {
+      logger.info('auth', 'unauthorized access for ensure Company user');
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
@@ -200,6 +211,7 @@ export async function setupAuth(app: Express) {
 
   const ensureSuperAdmin = (req: Request, res: Response, next: NextFunction) => {
     if (!req.isAuthenticated()) {
+      logger.info('auth', 'unauthorized access for ensure superadmin middleware in auth.ts file');
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
@@ -286,11 +298,6 @@ export async function setupAuth(app: Express) {
       const {
         companyName,
         companySlug,
-
-
-
-
-
         adminFullName,
         adminEmail,
         adminUsername,
@@ -942,6 +949,90 @@ export async function setupAuth(app: Express) {
     }
   });
 
+  app.delete("/api/admin/companies/bulk", ensureSuperAdmin, async (req, res) => {
+    
+    try {
+      
+      const { companyIds } = req.body;
+
+      if (!Array.isArray(companyIds) || companyIds.length === 0) {
+        return res.status(400).json({ error: "Company IDs array is required" });
+      }
+
+       
+
+      const numericCompanyIds = companyIds.map(id => {
+        if (typeof id === 'string') {
+          const numId = parseInt(id, 10);
+          return isNaN(numId) ? null : numId;
+        }
+        return typeof id === 'number' ? id : null;
+      }).filter(id => id !== null) as number[];
+      
+      
+      const validCompanyIds = numericCompanyIds.filter(id => id > 0);
+      
+      if (validCompanyIds.length === 0) {
+        return res.status(400).json({ error: "No valid company IDs provided" });
+      }
+      
+      if (validCompanyIds.length !== companyIds.length) {
+       
+        return res.status(400).json({ error: "Some company IDs are invalid" });
+      }
+
+
+
+      const companies = await storage.getAllCompanies();
+      const systemCompanies = companies.filter(c => c.slug === 'system');
+      const systemCompanyIds = systemCompanies.map(c => c.id);
+      
+      const hasSystemCompanies = validCompanyIds.some(id => systemCompanyIds.includes(id));
+      if (hasSystemCompanies) {
+        return res.status(400).json({ error: "Cannot delete system companies" });
+      }
+
+
+      const { companyDeletionService } = await import('./services/company-deletion');
+      
+
+      const deletionResults = [];
+      for (const companyId of validCompanyIds) {
+        try {
+          
+
+          const company = await storage.getCompany(companyId);
+          if (!company) {
+            deletionResults.push({ companyId, success: false, error: `Company ${companyId} not found` });
+            continue;
+          }
+          
+          
+          const result = await companyDeletionService.deleteCompany(companyId, (req as any).user.id);
+          deletionResults.push({ companyId, success: true, result });
+        } catch (error: unknown) {
+          deletionResults.push({ companyId, success: false, error: error instanceof Error ? error.message : 'Unknown error' });
+        }
+      }
+
+      const successCount = deletionResults.filter(r => r.success).length;
+      const failureCount = deletionResults.filter(r => !r.success).length;
+
+
+      res.json({
+        success: true,
+        message: `Successfully deleted ${successCount} companies${failureCount > 0 ? `, ${failureCount} failed` : ''}`,
+        results: deletionResults,
+        totalRequested: validCompanyIds.length,
+        successCount,
+        failureCount
+      });
+
+    } catch (error) {
+      console.error("Error in bulk company deletion:", error);
+      res.status(500).json({ error: "Failed to delete companies" });
+    }
+  });
 
   app.delete("/api/admin/companies/:id", ensureSuperAdmin, async (req, res) => {
     try {

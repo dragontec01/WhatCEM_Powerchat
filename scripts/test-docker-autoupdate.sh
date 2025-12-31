@@ -135,7 +135,7 @@ test_api_endpoints() {
     sleep 5
     
     # Test update status endpoint
-    local status_response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:9000/api/v1/system/update/status)
+    local status_response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/api/v1/system/update/status)
     
     if [ "$status_response" = "200" ]; then
         log_success "Update status API endpoint is accessible"

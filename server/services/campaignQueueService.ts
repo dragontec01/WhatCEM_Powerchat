@@ -8,7 +8,7 @@ import {
 } from '@shared/db/schema';
 import { and, asc, eq, inArray, lte, sql } from 'drizzle-orm';
 import path from 'path';
-import { db } from '../db';
+import { getDb } from '../db';
 import {
   Campaign,
   CampaignProcessingResult,
@@ -22,9 +22,25 @@ import axios from 'axios';
 import FormData from 'form-data';
 import { storage } from '../storage';
 
+/**
+ * Normalize phone number to +E.164 format
+ * @param phone The phone number to normalize
+ * @returns Normalized phone number in +E.164 format
+ */
+function normalizePhoneToE164(phone: string): string {
+  if (!phone) return phone;
 
 
+  let normalized = phone.replace(/[^\d+]/g, '');
 
+
+  if (normalized.startsWith('+')) {
+    return normalized;
+  }
+
+
+  return '+' + normalized;
+}
 
 interface QueueItem {
   id: number;
@@ -78,9 +94,12 @@ interface ConnectionProcessingPool {
 }
 
 export class CampaignQueueService {
+  private static globalProcessingEnabled: boolean = true;
   private campaignService: CampaignService;
   private isGlobalProcessing: boolean;
   private processingInterval: NodeJS.Timeout | null;
+  private analyticsInterval: NodeJS.Timeout | null;
+  private cleanupInterval: NodeJS.Timeout | null;
   private accountRotation: Map<string, number>;
   private connectionPools: Map<number, ConnectionProcessingPool>;
   private maxConcurrentConnections: number;
@@ -90,6 +109,8 @@ export class CampaignQueueService {
     this.campaignService = new CampaignService();
     this.isGlobalProcessing = false;
     this.processingInterval = null;
+    this.analyticsInterval = null;
+    this.cleanupInterval = null;
     this.accountRotation = new Map<string, number>();
     this.connectionPools = new Map<number, ConnectionProcessingPool>();
     this.maxConcurrentConnections = 5; // Process up to 5 connections concurrently
@@ -106,6 +127,7 @@ export class CampaignQueueService {
       return;
     }
 
+    CampaignQueueService.globalProcessingEnabled = true;
     this.isGlobalProcessing = true;
 
 
@@ -122,7 +144,7 @@ export class CampaignQueueService {
 
 
 
-    setInterval(async () => {
+    this.analyticsInterval = setInterval(async () => {
       try {
         await this.recordAnalyticsSnapshots();
       } catch (error) {
@@ -133,7 +155,7 @@ export class CampaignQueueService {
 
 
 
-    setInterval(() => {
+    this.cleanupInterval = setInterval(() => {
       this.cleanupInactivePools();
     }, 60000); // Cleanup every minute
 
@@ -141,31 +163,49 @@ export class CampaignQueueService {
 
   }
 
-  public stopQueueProcessor(): void {
+  public async stopQueueProcessor(): Promise<void> {
+
+    CampaignQueueService.globalProcessingEnabled = false;
+
+
     if (this.processingInterval) {
       clearInterval(this.processingInterval);
       this.processingInterval = null;
     }
-    this.isGlobalProcessing = false;
-    
 
-    this.activeProcessingPromises.forEach(async (promise) => {
+
+    if (this.analyticsInterval) {
+      clearInterval(this.analyticsInterval);
+      this.analyticsInterval = null;
+    }
+
+
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
+
+    this.isGlobalProcessing = false;
+
+
+    if (this.activeProcessingPromises.size > 0) {
+
       try {
-        await promise;
+        await Promise.all(Array.from(this.activeProcessingPromises.values()));
       } catch (error) {
-        console.error('Error waiting for processing to complete:', error);
+        console.error('[Campaign Queue] Error waiting for processing to complete:', error);
       }
-    });
-    
+    }
 
     this.connectionPools.clear();
     this.activeProcessingPromises.clear();
+
   }
 
   private async processQueue(): Promise<void> {
     try {
 
-      const queueItems = await db.select({
+      const queueItems = await getDb().select({
         id: campaignQueue.id,
         campaign_id: campaignQueue.campaignId,
         recipient_id: campaignQueue.recipientId,
@@ -240,7 +280,7 @@ export class CampaignQueueService {
   private async getCampaignChannelConnection(campaignId: number): Promise<ChannelConnection | null> {
     try {
       
-      const [campaign] = await db.select({
+      const [campaign] = await getDb().select({
         id: campaigns.id,
         channelId: campaigns.channelId,
         channelIds: campaigns.channelIds,
@@ -269,7 +309,7 @@ export class CampaignQueueService {
     
           
           if (campaign.channelId) {
-            const [fallbackConnection] = await db.select()
+            const [fallbackConnection] = await getDb().select()
               .from(channelConnections)
               .where(and(
                 eq(channelConnections.id, campaign.channelId),
@@ -285,7 +325,7 @@ export class CampaignQueueService {
         }
 
         
-        const [channelConnection] = await db.select()
+        const [channelConnection] = await getDb().select()
           .from(channelConnections)
           .where(and(
             eq(channelConnections.id, selectedChannelId),
@@ -305,7 +345,7 @@ export class CampaignQueueService {
       }
 
       
-      const [channelConnection] = await db.select()
+      const [channelConnection] = await getDb().select()
         .from(channelConnections)
         .where(and(
           eq(channelConnections.id, campaign.channelId),
@@ -346,7 +386,7 @@ export class CampaignQueueService {
 
       for (const channelId of channelIds) {
         try {
-          const account = await db.select()
+          const account = await getDb().select()
             .from(channelConnections)
             .where(and(
               eq(channelConnections.id, channelId),
@@ -385,7 +425,7 @@ export class CampaignQueueService {
         availableAccounts.map(async (account) => {
           try {
             
-            const allMessages = await db.select({
+            const allMessages = await getDb().select({
               completedAt: campaignQueue.completedAt
             })
             .from(campaignQueue)
@@ -534,7 +574,7 @@ export class CampaignQueueService {
         
         for (const channelId of channelIds) {
           try {
-            const fallbackAccount = await db.select()
+            const fallbackAccount = await getDb().select()
               .from(channelConnections)
               .where(and(
                 eq(channelConnections.id, channelId),
@@ -619,7 +659,7 @@ export class CampaignQueueService {
       const recipientMap = new Map(recipientData.map(r => [r.id, r]));
 
       
-      const [campaignForSettings] = await db.select({
+      const [campaignForSettings] = await getDb().select({
         antiBanSettings: campaigns.antiBanSettings
       })
       .from(campaigns)
@@ -643,7 +683,7 @@ export class CampaignQueueService {
             }
 
             
-            await db.update(campaignQueue)
+            await getDb().update(campaignQueue)
               .set({
                 accountId: channelConnection.id,
                 status: 'processing',
@@ -682,11 +722,11 @@ export class CampaignQueueService {
   private async processQueueItem(queueItem: QueueItem): Promise<CampaignProcessingResult> {
     try {
 
-      const [campaign] = await db.select()
+      const [campaign] = await getDb().select()
         .from(campaigns)
         .where(eq(campaigns.id, queueItem.campaign_id));
 
-      const [recipient] = await db.select({
+      const [recipient] = await getDb().select({
         id: campaignRecipients.id,
         contactId: campaignRecipients.contactId,
         variables: campaignRecipients.variables,
@@ -732,12 +772,12 @@ export class CampaignQueueService {
         recipient_name: recipientData.name || ''
       };
 
-      await db.update(campaignQueue)
+      await getDb().update(campaignQueue)
         .set({ metadata: updatedMetadata })
         .where(eq(campaignQueue.id, queueItem.id));
 
 
-      const [channelConnection] = await db.select()
+      const [channelConnection] = await getDb().select()
         .from(channelConnections)
         .where(eq(channelConnections.id, queueItem.account_id!));
 
@@ -752,7 +792,7 @@ export class CampaignQueueService {
       let templateData: any = null;
       if (campaignData.templateId && connection.channelType === 'whatsapp_official') {
 
-        const [template] = await db.select()
+        const [template] = await getDb().select()
           .from(campaignTemplates)
           .where(eq(campaignTemplates.id, campaignData.templateId));
 
@@ -809,10 +849,11 @@ export class CampaignQueueService {
             connection.id,
             connection.userId,
             connection.companyId,
-            recipientData.phone || '',
+            normalizePhoneToE164(recipientData.phone || ''),
             templateData.whatsappTemplateName,
             templateData.whatsappTemplateLanguage || 'en',
-            components.length > 0 ? components : undefined
+            components.length > 0 ? components : undefined,
+            true // skipBroadcast - avoid duplicate client updates
           );
 
         } catch (error) {
@@ -845,13 +886,14 @@ export class CampaignQueueService {
               connection.id,
               connection.userId,
               connection.companyId,
-              recipientData.phone || '',
+              normalizePhoneToE164(recipientData.phone || ''),
               mediaType,
               mediaUrl,
               personalizedContent,
               undefined,
               undefined,
-              true // isFromBot = true for campaign messages
+              true, // isFromBot = true for campaign messages
+              true  // skipBroadcast - avoid duplicate client updates
             );
           } else {
             throw new Error(`Unsupported channel type: ${connection.channelType}`);
@@ -879,7 +921,7 @@ export class CampaignQueueService {
               connection.id,
               connection.userId,
               connection.companyId,
-              recipientData.phone || '',
+              normalizePhoneToE164(recipientData.phone || ''),
               personalizedContent
             );
           }
@@ -902,7 +944,7 @@ export class CampaignQueueService {
             connection.id,
             connection.userId,
             connection.companyId,
-            recipientData.phone || '',
+            normalizePhoneToE164(recipientData.phone || ''),
             personalizedContent
           );
         } else {
@@ -913,7 +955,7 @@ export class CampaignQueueService {
 
 
 
-      await db.update(campaignQueue)
+      await getDb().update(campaignQueue)
         .set({
           status: 'completed',
           completedAt: new Date()
@@ -921,7 +963,7 @@ export class CampaignQueueService {
         .where(eq(campaignQueue.id, queueItem.id));
 
 
-      await db.update(campaignRecipients)
+      await getDb().update(campaignRecipients)
         .set({
           status: 'sent',
           sentAt: new Date()
@@ -974,7 +1016,7 @@ export class CampaignQueueService {
     try {
 
 
-      const [campaign] = await db.select()
+      const [campaign] = await getDb().select()
         .from(campaigns)
         .where(eq(campaigns.id, queueItem.campaign_id));
 
@@ -1000,7 +1042,7 @@ export class CampaignQueueService {
       if (campaignData.templateId && channelConnection.channelType === 'whatsapp_official') {
 
 
-        const [template] = await db.select()
+        const [template] = await getDb().select()
           .from(campaignTemplates)
           .where(eq(campaignTemplates.id, campaignData.templateId));
 
@@ -1023,25 +1065,60 @@ export class CampaignQueueService {
 
         const components: any[] = [];
         const templateVariables = (templateData.variables as string[]) || [];
-        const mediaUrls = (templateData.mediaUrls as string[]) || [];
+        
+
+        let templateMediaUrls = (templateData.mediaUrls as string[]) || [];
+        const campaignMediaUrls = (campaignData.mediaUrls as string[]) || [];
+        
+
+        const mediaUrls = campaignMediaUrls.length > 0 ? campaignMediaUrls : templateMediaUrls;
         const mediaHandle = templateData.mediaHandle; // Get stored media handle from template
 
+        
 
-        if (mediaUrls.length > 0) {
+
+        const hasMediaHandle = !!mediaHandle;
+        const hasMediaUrls = mediaUrls.length > 0;
+        const hasCampaignMedia = campaignMediaUrls.length > 0;
+        const hasAnyMedia = hasMediaHandle || hasMediaUrls || hasCampaignMedia;
+
+
+
+
+
+
+        if (hasAnyMedia) {
 
           let headerFormat = 'IMAGE'; // Default to IMAGE
-          const urlLower = mediaUrls[0].toLowerCase();
+          
 
-          if (urlLower.includes('/video/') || urlLower.match(/\.(mp4|mov|avi|webm)$/)) {
-            headerFormat = 'VIDEO';
-          } else if (urlLower.includes('/document/') || urlLower.match(/\.(pdf|doc|docx|xls|xlsx|ppt|pptx)$/)) {
-            headerFormat = 'DOCUMENT';
-          } else if (urlLower.includes('/image/') || urlLower.match(/\.(jpg|jpeg|png|gif|webp)$/)) {
-            headerFormat = 'IMAGE';
+          if (mediaUrls.length > 0) {
+            const urlLower = mediaUrls[0].toLowerCase();
+
+            if (urlLower.includes('/video/') || urlLower.match(/\.(mp4|mov|avi|webm)$/)) {
+              headerFormat = 'VIDEO';
+            } else if (urlLower.includes('/document/') || urlLower.match(/\.(pdf|doc|docx|xls|xlsx|ppt|pptx)$/)) {
+              headerFormat = 'DOCUMENT';
+            } else if (urlLower.includes('/image/') || urlLower.match(/\.(jpg|jpeg|png|gif|webp)$/)) {
+              headerFormat = 'IMAGE';
+            }
           }
 
 
-          if (mediaHandle) {
+
+
+          const isMediaHandleUrl = mediaHandle && (mediaHandle.startsWith('http://') || mediaHandle.startsWith('https://'));
+          
+          if (isMediaHandleUrl) {
+            console.warn('[Campaign Queue] mediaHandle is a URL, not a media ID. Moving to mediaUrls for upload.');
+
+            if (!mediaUrls.includes(mediaHandle)) {
+              mediaUrls.unshift(mediaHandle); // Add to beginning
+            }
+          }
+
+          if (mediaHandle && !isMediaHandleUrl) {
+
 
 
             
@@ -1056,10 +1133,9 @@ export class CampaignQueueService {
             });
 
 
-          } else {
+          } else if (mediaUrls.length > 0) {
 
 
-            
             let mediaUrl = mediaUrls[0];
 
 
@@ -1083,8 +1159,12 @@ export class CampaignQueueService {
               }
             }
 
+
+
             try {
               const mediaId = await this.uploadMediaToWhatsApp(mediaUrl, headerFormat, channelConnection);
+
+
 
               components.push({
                 type: 'header',
@@ -1096,11 +1176,10 @@ export class CampaignQueueService {
                 }]
               });
 
-
-
             } catch (uploadError: any) {
               console.error('[Campaign Queue] Failed to upload media, trying with link as fallback:', uploadError.message);
               
+
               components.push({
                 type: 'header',
                 parameters: [{
@@ -1110,9 +1189,18 @@ export class CampaignQueueService {
                   }
                 }]
               });
-              
-
             }
+          } else {
+
+            console.error('[Campaign Queue] Template requires media header but no media URL or handle found!');
+            console.error('[Campaign Queue] Template data:', {
+              id: templateData.id,
+              name: templateData.whatsappTemplateName,
+              mediaUrls: templateData.mediaUrls,
+              mediaHandle: templateData.mediaHandle
+            });
+            
+            throw new Error(`Template "${templateData.whatsappTemplateName}" requires media in header, but no media URL or media handle is configured. Please upload media for this template or select a different template.`);
           }
         }
 
@@ -1133,29 +1221,38 @@ export class CampaignQueueService {
 
 
 
+        console.log('[Campaign Queue] Sending template message:', {
+          templateName: templateData.whatsappTemplateName,
+          language: templateData.whatsappTemplateLanguage || 'en',
+          recipientPhone: recipientData.phone,
+          componentsCount: components.length,
+          hasMediaComponent: components.some(c => c.type === 'header'),
+          components: JSON.stringify(components, null, 2)
+        });
 
         try {
           const result = await whatsappOfficialService.sendTemplateMessage(
             channelConnection.id,
             channelConnection.userId,
             channelConnection.companyId,
-            recipientData.phone || '',
+            normalizePhoneToE164(recipientData.phone || ''),
             templateData.whatsappTemplateName,
             templateData.whatsappTemplateLanguage || 'en',
-            components.length > 0 ? components : undefined
+            components.length > 0 ? components : undefined,
+            true // skipBroadcast - avoid duplicate client updates
           );
 
 
 
 
-          await db.update(campaignQueue)
+          await getDb().update(campaignQueue)
             .set({
               status: 'completed',
               completedAt: new Date()
             })
             .where(eq(campaignQueue.id, queueItem.id));
 
-          await db.update(campaignRecipients)
+          await getDb().update(campaignRecipients)
             .set({
               status: 'sent',
               sentAt: new Date()
@@ -1203,6 +1300,39 @@ export class CampaignQueueService {
             components: components
           }, null, 2));
           
+
+          const errorMessage = error.message || '';
+          const errorDetails = error.response?.data?.error?.error_data?.details || '';
+          
+          if (errorMessage.includes('#132012') || errorDetails.includes('Format mismatch')) {
+
+            console.error('\n❌ MEDIA HEADER MISSING ERROR DETECTED ❌');
+            console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            console.error(`Template "${templateData.whatsappTemplateName}" requires media in the header.`);
+            console.error('\nCurrent configuration:');
+            console.error(`  - Template ID: ${templateData.id}`);
+            console.error(`  - Media URLs in template: ${(templateData.mediaUrls as string[])?.length || 0}`);
+            console.error(`  - Media handle: ${templateData.mediaHandle || 'Not configured'}`);
+            console.error(`  - Campaign media URLs: ${(campaignData.mediaUrls as string[])?.length || 0}`);
+            console.error('\n📝 HOW TO FIX:');
+            console.error('1. Upload media to WhatsApp and get media handle:');
+            console.error('   https://developers.facebook.com/docs/whatsapp/cloud-api/reference/media');
+            console.error('\n2. Update your template with media handle:');
+            console.error(`   UPDATE campaign_templates SET media_handle = 'YOUR_MEDIA_ID' WHERE id = ${templateData.id};`);
+            console.error('\nOR add media URL to template:');
+            console.error(`   UPDATE campaign_templates SET media_urls = '["https://your-domain.com/image.jpg"]'::jsonb WHERE id = ${templateData.id};`);
+            console.error('\nOR add media to campaign:');
+            console.error(`   UPDATE campaigns SET media_urls = '["https://your-domain.com/image.jpg"]'::jsonb WHERE id = ${queueItem.campaign_id};`);
+            console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+            
+
+            throw new Error(
+              `Template "${templateData.whatsappTemplateName}" requires media header but none configured. ` +
+              `Please add media_handle or media_urls to template ID ${templateData.id} or add media to campaign ${queueItem.campaign_id}. ` +
+              `See logs above for detailed instructions.`
+            );
+          }
+          
           throw error;
         }
       }
@@ -1223,7 +1353,7 @@ export class CampaignQueueService {
         recipient_name: recipientData.name || ''
       };
 
-      await db.update(campaignQueue)
+      await getDb().update(campaignQueue)
         .set({ metadata: updatedMetadata })
         .where(eq(campaignQueue.id, queueItem.id));
 
@@ -1257,13 +1387,14 @@ export class CampaignQueueService {
               channelConnection.id,
               channelConnection.userId,
               channelConnection.companyId,
-              recipientData.phone || '',
+              normalizePhoneToE164(recipientData.phone || ''),
               mediaType,
               mediaUrl,
               personalizedContent,
               undefined,
               undefined,
-              true // isFromBot = true for campaign messages
+              true, // isFromBot = true for campaign messages
+              true  // skipBroadcast - avoid duplicate client updates
             );
           } else {
             throw new Error(`Unsupported channel type: ${channelConnection.channelType}`);
@@ -1289,7 +1420,7 @@ export class CampaignQueueService {
               channelConnection.id,
               channelConnection.userId,
               channelConnection.companyId,
-              recipientData.phone || '',
+              normalizePhoneToE164(recipientData.phone || ''),
               personalizedContent
             );
           }
@@ -1311,7 +1442,7 @@ export class CampaignQueueService {
             channelConnection.id,
             channelConnection.userId,
             channelConnection.companyId,
-            recipientData.phone || '',
+            normalizePhoneToE164(recipientData.phone || ''),
             personalizedContent
           );
         } else {
@@ -1321,7 +1452,7 @@ export class CampaignQueueService {
 
 
       
-      await db.update(campaignQueue)
+      await getDb().update(campaignQueue)
         .set({
           status: 'completed',
           completedAt: new Date()
@@ -1329,7 +1460,7 @@ export class CampaignQueueService {
         .where(eq(campaignQueue.id, queueItem.id));
 
       
-      await db.update(campaignRecipients)
+      await getDb().update(campaignRecipients)
         .set({
           status: 'sent',
           sentAt: new Date()
@@ -1377,7 +1508,7 @@ export class CampaignQueueService {
     try {
       if (recipientIds.length === 0) return [];
 
-      const recipients = await db.select({
+      const recipients = await getDb().select({
         id: campaignRecipients.id,
         contactId: campaignRecipients.contactId,
         variables: campaignRecipients.variables,
@@ -1410,7 +1541,7 @@ export class CampaignQueueService {
     try {
       if (itemIds.length === 0) return;
 
-      await db.update(campaignQueue)
+      await getDb().update(campaignQueue)
         .set({
           status: 'failed',
           errorMessage: errorMessage,
@@ -1438,7 +1569,7 @@ export class CampaignQueueService {
 
       if (attempts >= maxAttempts) {
         
-        await db.update(campaignQueue)
+        await getDb().update(campaignQueue)
           .set({
             status: 'failed',
             errorMessage: errorMessage,
@@ -1448,7 +1579,7 @@ export class CampaignQueueService {
           .where(eq(campaignQueue.id, queueItem.id));
 
         
-        await db.update(campaignRecipients)
+        await getDb().update(campaignRecipients)
           .set({
             status: 'failed',
             failedAt: new Date(),
@@ -1460,7 +1591,7 @@ export class CampaignQueueService {
         await this.updateCampaignStatistics(queueItem.campaign_id);
 
         
-        const [campaignData] = await db.select({
+        const [campaignData] = await getDb().select({
           id: campaigns.id,
           name: campaigns.name,
           companyId: campaigns.companyId
@@ -1489,7 +1620,7 @@ export class CampaignQueueService {
         const retryDelay = Math.pow(2, attempts) * 60000; 
         const retryTime = new Date(Date.now() + retryDelay);
 
-        await db.update(campaignQueue)
+        await getDb().update(campaignQueue)
           .set({
             status: 'pending',
             scheduledFor: retryTime,
@@ -1572,9 +1703,15 @@ export class CampaignQueueService {
   
 
   private async recordAnalyticsSnapshots(): Promise<void> {
+
+    if (!this.isGlobalProcessing || !CampaignQueueService.globalProcessingEnabled) {
+
+      return;
+    }
+
     try {
       
-      const runningCampaigns = await db.select()
+      const runningCampaigns = await getDb().select()
         .from(campaigns)
         .where(eq(campaigns.status, 'running'));
 
@@ -1592,15 +1729,21 @@ export class CampaignQueueService {
   }
 
   public async checkCampaignCompletion(): Promise<void> {
+
+    if (!this.isGlobalProcessing || !CampaignQueueService.globalProcessingEnabled) {
+
+      return;
+    }
+
     try {
       
-      const potentiallyCompletedCampaigns = await db.select()
+      const potentiallyCompletedCampaigns = await getDb().select()
         .from(campaigns)
         .where(eq(campaigns.status, 'running'));
       for (const campaign of potentiallyCompletedCampaigns) {
         try {
           
-          const queueStats = await db.select({
+          const queueStats = await getDb().select({
             total: sql`COUNT(*)`,
             pending: sql`COUNT(*) FILTER (WHERE status = 'pending')`,
             processing: sql`COUNT(*) FILTER (WHERE status = 'processing')`,
@@ -1628,7 +1771,7 @@ export class CampaignQueueService {
 
           if (totalItems > 0 && activePendingItems === 0) {
             
-            await db.update(campaigns)
+            await getDb().update(campaigns)
               .set({
                 status: 'completed',
                 completedAt: new Date()
@@ -1666,7 +1809,7 @@ export class CampaignQueueService {
 
   public async getQueueStats(companyId: number): Promise<CampaignStats> {
     try {
-      const stats = await db.select({
+      const stats = await getDb().select({
         total: sql`COUNT(*)`,
         pending: sql`COUNT(*) FILTER (WHERE status = 'pending')`,
         processing: sql`COUNT(*) FILTER (WHERE status = 'processing')`,
@@ -1711,7 +1854,7 @@ export class CampaignQueueService {
       cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
 
 
-      const companyCampaigns = await db.select({ id: campaigns.id })
+      const companyCampaigns = await getDb().select({ id: campaigns.id })
         .from(campaigns)
         .where(eq(campaigns.companyId, companyId));
 
@@ -1721,7 +1864,7 @@ export class CampaignQueueService {
         return 0;
       }
 
-      const result = await db.delete(campaignQueue)
+      const result = await getDb().delete(campaignQueue)
         .where(and(
           eq(campaignQueue.status, 'failed'),
           inArray(campaignQueue.campaignId, campaignIds),
@@ -1737,7 +1880,7 @@ export class CampaignQueueService {
   public async pauseCampaignQueue(campaignId: number): Promise<void> {
     try {
 
-      await db.update(campaigns)
+      await getDb().update(campaigns)
         .set({
           status: 'paused',
           pausedAt: new Date()
@@ -1752,7 +1895,7 @@ export class CampaignQueueService {
   public async resumeCampaignQueue(campaignId: number): Promise<void> {
     try {
 
-      await db.update(campaigns)
+      await getDb().update(campaigns)
         .set({
           status: 'running',
           pausedAt: null
@@ -1767,7 +1910,7 @@ export class CampaignQueueService {
   public async cancelCampaignQueue(campaignId: number): Promise<void> {
     try {
 
-      await db.update(campaignQueue)
+      await getDb().update(campaignQueue)
         .set({
           status: 'cancelled'
         })
@@ -1777,7 +1920,7 @@ export class CampaignQueueService {
         ));
 
 
-      await db.update(campaigns)
+      await getDb().update(campaigns)
         .set({
           status: 'cancelled'
         })
@@ -1795,7 +1938,7 @@ export class CampaignQueueService {
   private async updateCampaignStatistics(campaignId: number): Promise<void> {
     try {
       
-      const recipientStats = await db.select({
+      const recipientStats = await getDb().select({
         total: sql`COUNT(*)`,
         sent: sql`COUNT(*) FILTER (WHERE status IN ('sent', 'delivered', 'read'))`,
         failed: sql`COUNT(*) FILTER (WHERE status = 'failed')`,
@@ -1811,7 +1954,7 @@ export class CampaignQueueService {
       const processedRecipients = successfulSends + failedSends;
 
       
-      await db.update(campaigns)
+      await getDb().update(campaigns)
         .set({
           totalRecipients,
           processedRecipients,
@@ -1839,7 +1982,7 @@ export class CampaignQueueService {
   }> {
     try {
       
-      const [campaign] = await db.select({
+      const [campaign] = await getDb().select({
         totalRecipients: campaigns.totalRecipients,
         processedRecipients: campaigns.processedRecipients,
         successfulSends: campaigns.successfulSends,
@@ -1893,10 +2036,16 @@ export class CampaignQueueService {
    * NEW: Concurrent queue processing method
    */
   private async processConcurrentQueue(): Promise<void> {
+
+    if (!this.isGlobalProcessing || !CampaignQueueService.globalProcessingEnabled) {
+
+      return;
+    }
+
     try {
 
 
-      const queueItems = await db.select({
+      const queueItems = await getDb().select({
         id: campaignQueue.id,
         campaign_id: campaignQueue.campaignId,
         recipient_id: campaignQueue.recipientId,
@@ -2128,7 +2277,7 @@ export class CampaignQueueService {
 
     try {
 
-      const [connection] = await db.select()
+      const [connection] = await getDb().select()
         .from(channelConnections)
         .where(eq(channelConnections.id, connectionId));
 
@@ -2163,7 +2312,7 @@ export class CampaignQueueService {
 
 
 
-            await db.update(campaignQueue)
+            await getDb().update(campaignQueue)
               .set({
                 accountId: connectionId,
                 status: 'processing',

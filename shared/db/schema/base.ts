@@ -1,4 +1,16 @@
-import { pgTable, serial, text, boolean, integer, timestamp, jsonb, pgEnum, unique, varchar } from "drizzle-orm/pg-core";
+import { 
+  pgTable,
+  serial,
+  text,
+  boolean,
+  integer,
+  timestamp,
+  jsonb,
+  pgEnum,
+  unique,
+  varchar,
+  real 
+} from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { plans } from "./billing";
 import z from "zod";
@@ -50,6 +62,8 @@ export const PERMISSIONS = {
   VIEW_PAGES: 'view_pages',
   MANAGE_PAGES: 'manage_pages',
 
+  VIEW_TASKS: 'view_tasks',
+  MANAGE_TASKS: 'manage_tasks',
 
   CREATE_BACKUPS: 'create_backups',
   RESTORE_BACKUPS: 'restore_backups',
@@ -89,6 +103,8 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     [PERMISSIONS.CONFIGURE_CHANNELS]: true,
     [PERMISSIONS.VIEW_PAGES]: true,
     [PERMISSIONS.MANAGE_PAGES]: true,
+    [PERMISSIONS.VIEW_TASKS]: true,
+    [PERMISSIONS.MANAGE_TASKS]: true,
     [PERMISSIONS.CREATE_BACKUPS]: true,
     [PERMISSIONS.RESTORE_BACKUPS]: true,
     [PERMISSIONS.MANAGE_BACKUPS]: true
@@ -125,6 +141,8 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     [PERMISSIONS.CONFIGURE_CHANNELS]: false,
     [PERMISSIONS.VIEW_PAGES]: false,
     [PERMISSIONS.MANAGE_PAGES]: false,
+    [PERMISSIONS.VIEW_TASKS]: true,
+    [PERMISSIONS.MANAGE_TASKS]: false,
     [PERMISSIONS.CREATE_BACKUPS]: false,
     [PERMISSIONS.RESTORE_BACKUPS]: false,
     [PERMISSIONS.MANAGE_BACKUPS]: false
@@ -568,6 +586,91 @@ export const insertTeamInvitationSchema = createInsertSchema(teamInvitations).pi
   expiresAt: true
 });
 
+export const taskCategories = pgTable("task_categories", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: 'cascade' }),
+  name: text("name").notNull(),
+  color: text("color"),
+  icon: text("icon"),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow()
+});
+
+export const databaseBackupStatusEnum = pgEnum('database_backup_status', ['creating', 'completed', 'failed', 'uploading', 'uploaded']);
+export const databaseBackupTypeEnum = pgEnum('database_backup_type', ['manual', 'scheduled']);
+export const databaseBackupFormatEnum = pgEnum('database_backup_format', ['sql', 'custom']);
+
+export const databaseBackups = pgTable("database_backups", {
+  id: text("id").primaryKey(), // UUID
+  filename: text("filename").notNull(),
+  type: databaseBackupTypeEnum("type").notNull().default('manual'),
+  description: text("description").notNull(),
+  size: integer("size").notNull().default(0), // in bytes
+  status: databaseBackupStatusEnum("status").notNull().default('creating'),
+  storageLocations: jsonb("storage_locations").notNull().default('["local"]'), // array of storage locations
+  checksum: text("checksum").notNull(),
+  errorMessage: text("error_message"),
+
+  databaseSize: integer("database_size").default(0),
+  tableCount: integer("table_count").default(0),
+  rowCount: integer("row_count").default(0),
+  compressionRatio: real("compression_ratio"),
+  encryptionEnabled: boolean("encryption_enabled").default(false),
+
+  appVersion: text("app_version"),
+  pgVersion: text("pg_version"),
+  instanceId: text("instance_id"),
+  dumpFormat: databaseBackupFormatEnum("dump_format").default('sql'),
+  schemaChecksum: text("schema_checksum"),
+
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow()
+});
+
+export const insertDatabaseBackupSchema = createInsertSchema(databaseBackups).pick({
+  id: true,
+  filename: true,
+  type: true,
+  description: true,
+  size: true,
+  status: true,
+  storageLocations: true,
+  checksum: true,
+  errorMessage: true,
+  databaseSize: true,
+  tableCount: true,
+  rowCount: true,
+  compressionRatio: true,
+  encryptionEnabled: true,
+  appVersion: true,
+  pgVersion: true,
+  instanceId: true,
+  dumpFormat: true,
+  schemaChecksum: true
+});
+
+export const databaseBackupLogs = pgTable("database_backup_logs", {
+  id: text("id").primaryKey(), // UUID
+  scheduleId: text("schedule_id").notNull(), // 'manual' (for non-scheduled events), 'restore' (for restore operations), or schedule UUID (for scheduled backups)
+  backupId: text("backup_id").references(() => databaseBackups.id),
+  status: text("status").notNull(), // 'success' | 'failed' | 'partial' | 'in_progress' - faithful to actual state, not coerced
+  timestamp: timestamp("timestamp").notNull().defaultNow(),
+  errorMessage: text("error_message"),
+  metadata: jsonb("metadata").default('{}'), // Contains event_type for non-scheduled events (e.g., 'cleanup', 'cleanup_deleted', 'cleanup_failed')
+  createdAt: timestamp("created_at").notNull().defaultNow()
+});
+
+export const insertDatabaseBackupLogSchema = createInsertSchema(databaseBackupLogs).pick({
+  id: true,
+  scheduleId: true,
+  backupId: true,
+  status: true,
+  timestamp: true,
+  errorMessage: true,
+  metadata: true
+});
+
 export type Company = typeof companies.$inferSelect;
 export type InsertCompany = z.infer<typeof insertCompanySchema>;
 
@@ -598,3 +701,12 @@ export type InsertCompanyPage = typeof companyPages.$inferInsert;
 export type TeamInvitation = typeof teamInvitations.$inferSelect;
 export type InsertTeamInvitation = z.infer<typeof insertTeamInvitationSchema>;
 export type InvitationStatus = z.infer<typeof invitationStatusTypes>;
+
+export type TaskCategory = typeof taskCategories.$inferSelect;
+export type InsertTaskCategory = typeof taskCategories.$inferInsert;
+
+export type DatabaseBackup = typeof databaseBackups.$inferSelect;
+export type InsertDatabaseBackup = z.infer<typeof insertDatabaseBackupSchema>;
+
+export type DatabaseBackupLog = typeof databaseBackupLogs.$inferSelect;
+export type InsertDatabaseBackupLog = z.infer<typeof insertDatabaseBackupLogSchema>;

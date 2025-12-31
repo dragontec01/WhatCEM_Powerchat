@@ -47,7 +47,7 @@ const config = {
   // Resolve extensions for proper ESM module resolution
   resolveExtensions: ['.ts', '.js', '.mjs', '.json'],
 
-  drop: isProduction ? ['debugger'] : [],
+  drop: isProduction ? [ 'debugger'] : [],
 
   define: {
     'process.env.NODE_ENV': JSON.stringify(mode),

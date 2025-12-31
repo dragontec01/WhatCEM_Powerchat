@@ -16,3 +16,4 @@ export * from "./contacts_extras";
 export * from "./translations";
 export * from "./calendars";
 export * from "./affiliates";
+export * from "./schema_scheduled_messages";

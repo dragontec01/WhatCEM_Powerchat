@@ -16,7 +16,7 @@ NC='\033[0m' # No Color
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 INSTANCES_DIR="$PROJECT_ROOT/instances"
-DEFAULT_APP_PORT=9000
+DEFAULT_APP_PORT=5000
 DEFAULT_DB_PORT=5432
 
 # Function to print colored output
@@ -42,7 +42,7 @@ show_usage() {
 Usage: $0 <instance_name> [options]
 
 Options:
-    --app-port PORT         Application port (default: auto-assigned starting from 9000)
+    --app-port PORT         Application port (default: auto-assigned starting from 5000)
     --db-port PORT          Database port (default: auto-assigned starting from 5432)
     --company-name NAME     Company name for the instance
     --admin-email EMAIL     Admin email address

@@ -883,11 +883,54 @@ router.post('/sync-from-meta', ensureAuthenticated, async (req, res) => {
 
         if (existingTemplate && existingTemplate.length > 0) {
 
+          let mediaHandle: string | undefined;
+          const mediaUrls: string[] = [];
+          let headerFormat: string | undefined;
+
+          if (metaTemplate.components && Array.isArray(metaTemplate.components)) {
+            for (const component of metaTemplate.components) {
+              if (component.type === 'HEADER') {
+                headerFormat = component.format;
+                
+
+                if (headerFormat && ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(headerFormat)) {
+
+                  if (component.example?.header_handle && Array.isArray(component.example.header_handle)) {
+                    const handleValue = component.example.header_handle[0];
+
+
+                    if (handleValue && !handleValue.startsWith('http://') && !handleValue.startsWith('https://')) {
+                      mediaHandle = handleValue;
+                    } else if (handleValue) {
+
+                      mediaUrls.push(handleValue);
+                    }
+                  }
+                  
+
+                  if (component.example?.header_url && Array.isArray(component.example.header_url)) {
+                    const url = component.example.header_url[0];
+                    if (url) {
+                      mediaUrls.push(url);
+                    }
+                  }
+                  
+
+                  if (component.url) {
+                    mediaUrls.push(component.url);
+                  }
+                }
+              }
+            }
+          }
+
           await db
             .update(campaignTemplates)
             .set({
               whatsappTemplateStatus: status as 'pending' | 'approved' | 'rejected' | 'disabled',
               whatsappTemplateCategory: metaTemplate.category?.toLowerCase() || 'utility',
+              mediaUrls: mediaUrls.length > 0 ? mediaUrls : existingTemplate[0].mediaUrls,
+              mediaHandle: mediaHandle || existingTemplate[0].mediaHandle,
             })
             .where(eq(campaignTemplates.id, existingTemplate[0].id));
 
@@ -895,18 +938,79 @@ router.post('/sync-from-meta', ensureAuthenticated, async (req, res) => {
           logger.info('whatsapp-templates', 'Updated existing template', {
             templateId: metaTemplate.id,
             name: metaTemplate.name,
-            status
+            status,
+            hasMediaHandle: !!mediaHandle,
+            hasMediaUrls: mediaUrls.length > 0,
+            headerFormat
           });
         } else {
 
 
           let content = '';
           let headerText = '';
+          let mediaHandle: string | undefined;
+          const mediaUrls: string[] = [];
+          let headerFormat: string | undefined;
 
           if (metaTemplate.components && Array.isArray(metaTemplate.components)) {
             for (const component of metaTemplate.components) {
               if (component.type === 'HEADER') {
                 headerText = component.text || '';
+                headerFormat = component.format;
+                
+
+                if (headerFormat && ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(headerFormat)) {
+
+                  if (component.example?.header_handle && Array.isArray(component.example.header_handle)) {
+                    const handleValue = component.example.header_handle[0];
+
+
+                    if (handleValue && !handleValue.startsWith('http://') && !handleValue.startsWith('https://')) {
+                      mediaHandle = handleValue;
+                      logger.info('whatsapp-templates', 'Found media handle (ID) in template', {
+                        templateId: metaTemplate.id,
+                        templateName: metaTemplate.name,
+                        mediaHandle,
+                        format: headerFormat
+                      });
+                    } else if (handleValue) {
+
+                      mediaUrls.push(handleValue);
+                      logger.info('whatsapp-templates', 'Found media URL in header_handle', {
+                        templateId: metaTemplate.id,
+                        templateName: metaTemplate.name,
+                        url: handleValue,
+                        format: headerFormat
+                      });
+                    }
+                  }
+                  
+
+                  if (component.example?.header_url && Array.isArray(component.example.header_url)) {
+                    const url = component.example.header_url[0];
+                    if (url) {
+                      mediaUrls.push(url);
+                      logger.info('whatsapp-templates', 'Found media URL in template', {
+                        templateId: metaTemplate.id,
+                        templateName: metaTemplate.name,
+                        url,
+                        format: headerFormat
+                      });
+                    }
+                  }
+                  
+
+                  if (component.url) {
+                    mediaUrls.push(component.url);
+                    logger.info('whatsapp-templates', 'Found media URL directly in component', {
+                      templateId: metaTemplate.id,
+                      templateName: metaTemplate.name,
+                      url: component.url,
+                      format: headerFormat
+                    });
+                  }
+                }
+
                 if (headerText) {
                   content += headerText + '\n\n';
                 }
@@ -934,7 +1038,8 @@ router.post('/sync-from-meta', ensureAuthenticated, async (req, res) => {
               whatsappTemplateLanguage: metaTemplate.language || 'en',
               content: content || 'Template content',
               variables: [],
-              mediaUrls: [],
+              mediaUrls: mediaUrls,
+              mediaHandle: mediaHandle,
               channelType: 'whatsapp',
               whatsappChannelType: 'official',
               isActive: true,
@@ -945,7 +1050,10 @@ router.post('/sync-from-meta', ensureAuthenticated, async (req, res) => {
           logger.info('whatsapp-templates', 'Created new template from Meta', {
             templateId: metaTemplate.id,
             name: metaTemplate.name,
-            status
+            status,
+            hasMediaHandle: !!mediaHandle,
+            hasMediaUrls: mediaUrls.length > 0,
+            headerFormat
           });
         }
       } catch (error: any) {

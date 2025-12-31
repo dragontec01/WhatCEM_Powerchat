@@ -113,7 +113,7 @@ ADMIN_PASSWORD=$(generate_password)
 prompt_with_default "Admin password" "$ADMIN_PASSWORD" ADMIN_PASSWORD
 
 # Ports
-prompt_with_default "Application port" "9000" APP_PORT
+prompt_with_default "Application port" "5000" APP_PORT
 prompt_with_default "Database port" "5432" DB_PORT
 
 echo

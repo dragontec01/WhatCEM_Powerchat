@@ -109,6 +109,7 @@ export const contactTasks = pgTable("contact_tasks", {
   assignedTo: text("assigned_to"),
   category: text("category"),
   tags: text("tags").array(),
+  backgroundColor: text("background_color").default('#ffffff'),
 
   createdBy: integer("created_by").references(() => users.id, { onDelete: 'set null' }),
   updatedBy: integer("updated_by").references(() => users.id, { onDelete: 'set null' }),
