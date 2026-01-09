@@ -32,6 +32,7 @@ jobs:
         run: npm run build
         env:
           NODE_ENV: production
+          INSTANCE_NAME: whatcem
       
       - name: Create deployment archive
         run: |

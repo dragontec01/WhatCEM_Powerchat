@@ -7,7 +7,7 @@ export const FACEBOOK_APP_CONFIG = {
   apiVersion: 'v22.0', // Use v22.0 for consistency with backend
 };
 
-
+console.log({FACEBOOK_APP_CONFIG});
 export function validateFacebookConfig(): { isValid: boolean; missingFields: string[] } {
   const missingFields: string[] = [];
 

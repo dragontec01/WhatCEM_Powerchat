@@ -43,6 +43,7 @@ export function WhatsAppEmbeddedSignup({ isOpen, onClose, onSuccess }: Props) {
         try {
 
           const validation = validateFacebookConfig();
+          console.log('Facebook config validation:', validation);
           if (!validation.isValid) {
             setConfigError(`Missing configuration: ${validation.missingFields.join(', ')}`);
             setConfigValid(false);
