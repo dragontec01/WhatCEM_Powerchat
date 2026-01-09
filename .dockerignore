@@ -1,11 +1,11 @@
-node_modules
+# node_modules
 npm-debug.log
-dist
+# dist
 .git
 .github
 .vscode
 *.md
-.env
+#.env
 uploads/*
 !uploads/.gitkeep
 whatsapp-sessions/*
