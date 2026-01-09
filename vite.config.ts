@@ -129,6 +129,7 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
+    allowedHosts: isProduction ? [] : true,
   },
   };
 });

@@ -5,7 +5,7 @@ npm-debug.log
 .github
 .vscode
 *.md
-#.env
+.env
 uploads/*
 !uploads/.gitkeep
 whatsapp-sessions/*

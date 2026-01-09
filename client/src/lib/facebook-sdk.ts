@@ -5,7 +5,8 @@ declare global {
     FB: {
       init: (options: {
         appId: string;
-        autoLogAppEvents: boolean;
+        autoLogAppEvents?: boolean;
+        cookie?: boolean;
         xfbml: boolean;
         version: string;
       }) => void;

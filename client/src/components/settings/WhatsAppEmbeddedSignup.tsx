@@ -102,14 +102,15 @@ export function WhatsAppEmbeddedSignup({ isOpen, onClose, onSuccess }: Props) {
     });
   };
 
-  const handleFacebookLoginResponse = (response: FacebookLoginResponse) => {    
+  const handleFacebookLoginResponse = (response: FacebookLoginResponse) => {
+    console.log({response})
     if (response.authResponse && response.authResponse.code) {
       exchangeCodeForWhatsAppConnection(response.authResponse.code);
     } else {
       setLoading(false);
       toast({
         title: "Signup Cancelled",
-        description: "The WhatsApp Business signup process was cancelled or encountered an error.",
+        description: `The WhatsApp Business signup process was cancelled or encountered an error. ${JSON.stringify({response, hola: true})}`,
         variant: "destructive"
       });
     }
