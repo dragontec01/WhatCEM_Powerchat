@@ -122,8 +122,8 @@ export function initFacebookSDK(appId: string, version = 'v22.0'): Promise<void>
  * Setup event listener for WhatsApp signup events
  * @param callback Function to call when a WhatsApp signup event is received
  */
-export async function setupWhatsAppSignupListener(callback: (data: WhatsAppSignupData) => void) {
-  window.addEventListener('message', async (event) => {
+export function setupWhatsAppSignupListener(callback: (data: WhatsAppSignupData) => void) {
+  window.addEventListener('message', (event) => {
     if (event.origin !== "https://www.facebook.com" && event.origin !== "https://web.facebook.com") return;
     
     try {
@@ -169,9 +169,9 @@ export async function launchWhatsAppSignup(
 
 
   try {
-    await window.FB.getLoginStatus(async () => {
+    window.FB.getLoginStatus(() => {
 
-      await window.FB.login(callback, {
+      window.FB.login(callback, {
         config_id: configId,
         response_type: 'code',
         override_default_response_type: true,

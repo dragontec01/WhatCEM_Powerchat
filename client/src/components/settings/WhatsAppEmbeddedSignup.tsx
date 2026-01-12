@@ -25,7 +25,7 @@ interface TermsState {
   acceptPrivacyPolicy: boolean;
 }
 
-export async function WhatsAppEmbeddedSignup({ isOpen, onClose, onSuccess }: Props) {
+export function WhatsAppEmbeddedSignup({ isOpen, onClose, onSuccess }: Props) {
   const { toast } = useToast();
   const [sdkInitialized, setSdkInitialized] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -61,9 +61,9 @@ export async function WhatsAppEmbeddedSignup({ isOpen, onClose, onSuccess }: Pro
           await initFacebookSDK(FACEBOOK_APP_CONFIG.appId, FACEBOOK_APP_CONFIG.apiVersion);
           setSdkInitialized(true);
 
-          await setupWhatsAppSignupListener(async (data) => {
+          setupWhatsAppSignupListener((data) => {
             if (data.wabaId && data.phoneNumberId) {
-              await handleSuccessfulSignup(data.wabaId, data.phoneNumberId);
+              handleSuccessfulSignup(data.wabaId, data.phoneNumberId);
             } else if (data.screen) {
               toast({
                 title: "Signup Incomplete",
@@ -110,7 +110,7 @@ export async function WhatsAppEmbeddedSignup({ isOpen, onClose, onSuccess }: Pro
       setLoading(false);
       toast({
         title: "Signup Cancelled",
-        description: `The WhatsApp Business signup process was cancelled or encountered an error. ${JSON.stringify({response, hola: true})}`,
+        description: `The WhatsApp Business signup process was cancelled or encountered an error. ${JSON.stringify({response})}`,
         variant: "destructive"
       });
     }
@@ -197,7 +197,7 @@ export async function WhatsAppEmbeddedSignup({ isOpen, onClose, onSuccess }: Pro
     }
   };
 
-  const launchSignup = async () => {
+  const launchSignup = () => {
     if (!terms.acceptTerms || !terms.acceptPrivacyPolicy) {
       toast({
         title: "Terms Required",
@@ -228,7 +228,7 @@ export async function WhatsAppEmbeddedSignup({ isOpen, onClose, onSuccess }: Pro
     }
 
     try {
-      await launchWhatsAppSignup(
+      launchWhatsAppSignup(
         FACEBOOK_APP_CONFIG.whatsAppConfigId,
         handleFacebookLoginResponse
       );
