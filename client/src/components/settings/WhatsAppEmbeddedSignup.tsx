@@ -25,7 +25,7 @@ interface TermsState {
   acceptPrivacyPolicy: boolean;
 }
 
-export function WhatsAppEmbeddedSignup({ isOpen, onClose, onSuccess }: Props) {
+export async function WhatsAppEmbeddedSignup({ isOpen, onClose, onSuccess }: Props) {
   const { toast } = useToast();
   const [sdkInitialized, setSdkInitialized] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -61,9 +61,9 @@ export function WhatsAppEmbeddedSignup({ isOpen, onClose, onSuccess }: Props) {
           await initFacebookSDK(FACEBOOK_APP_CONFIG.appId, FACEBOOK_APP_CONFIG.apiVersion);
           setSdkInitialized(true);
 
-          setupWhatsAppSignupListener((data) => {
+          await setupWhatsAppSignupListener(async (data) => {
             if (data.wabaId && data.phoneNumberId) {
-              handleSuccessfulSignup(data.wabaId, data.phoneNumberId);
+              await handleSuccessfulSignup(data.wabaId, data.phoneNumberId);
             } else if (data.screen) {
               toast({
                 title: "Signup Incomplete",
@@ -197,7 +197,7 @@ export function WhatsAppEmbeddedSignup({ isOpen, onClose, onSuccess }: Props) {
     }
   };
 
-  const launchSignup = () => {
+  const launchSignup = async () => {
     if (!terms.acceptTerms || !terms.acceptPrivacyPolicy) {
       toast({
         title: "Terms Required",
@@ -228,7 +228,7 @@ export function WhatsAppEmbeddedSignup({ isOpen, onClose, onSuccess }: Props) {
     }
 
     try {
-      launchWhatsAppSignup(
+      await launchWhatsAppSignup(
         FACEBOOK_APP_CONFIG.whatsAppConfigId,
         handleFacebookLoginResponse
       );
