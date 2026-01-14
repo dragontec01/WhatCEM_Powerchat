@@ -53,9 +53,9 @@ interface WhatsAppSignupData {
 /**
  * Initialize Facebook SDK
  * @param appId Your Facebook App ID
- * @param version Graph API version (e.g., 'v22.0')
+ * @param version Graph API version (e.g., 'v24.0')
  */
-export function initFacebookSDK(appId: string, version = 'v22.0'): Promise<void> {
+export function initFacebookSDK(appId: string, version = 'v24.0'): Promise<void> {
   return new Promise((resolve, reject) => {
 
     if (document.getElementById('facebook-jssdk')) {
@@ -63,6 +63,7 @@ export function initFacebookSDK(appId: string, version = 'v22.0'): Promise<void>
       if (window.FB) {
         window.FB.init({
           appId: appId,
+          autoLogAppEvents: true,
           cookie: true,
           xfbml: true,
           version: version
@@ -87,22 +88,6 @@ export function initFacebookSDK(appId: string, version = 'v22.0'): Promise<void>
     }
 
 
-    window.fbAsyncInit = function() {
-      window.FB.init({
-        appId: appId,
-        cookie: true,
-        xfbml: true,
-        version: version
-      });
-      
-
-
-      setTimeout(() => {
-        resolve();
-      }, 1000); // Wait 1 second for internal initialization
-    };
-
-
     const script = document.createElement('script');
     script.id = 'facebook-jssdk';
     script.src = 'https://connect.facebook.net/en_US/sdk.js';
@@ -115,6 +100,21 @@ export function initFacebookSDK(appId: string, version = 'v22.0'): Promise<void>
     };
     
     document.head.appendChild(script);
+
+    window.fbAsyncInit = function() {
+      window.FB.init({
+        appId: appId,
+        autoLogAppEvents: true,
+        cookie: true,
+        xfbml: true,
+        version: version
+      });
+
+      setTimeout(() => {
+        resolve();
+      }, 1000); // Wait 1 second for internal initialization
+    };
+
   });
 }
 
@@ -125,15 +125,23 @@ export function initFacebookSDK(appId: string, version = 'v22.0'): Promise<void>
 export function setupWhatsAppSignupListener(callback: (data: WhatsAppSignupData) => void) {
   console.log('whatsappSetupcalled')
   window.addEventListener('message', async (event) => {
-    if (event.origin !== "https://www.facebook.com" && event.origin !== "https://web.facebook.com") return;
+    if (!event.origin.endsWith("facebook.com")) return;
     console.log('Received message from origin:', {event});
     try {
       const data = JSON.parse(event.data);
       if (data.type === 'WA_EMBEDDED_SIGNUP') {
         callback(data);
+      } else {
+        callback({
+          ...data,
+          screen: data.screen || 'unknown_screen'
+        });
       }
-    } catch {
-
+    } catch(error) {
+      callback({
+        type: 'WA_EMBEDDED_SIGNUP',
+        screen: error instanceof Error ? error.message : 'unknown_error'
+      })
     }
   });
 }
@@ -170,18 +178,14 @@ export async function launchWhatsAppSignup(
 
 
   try {
-    window.FB.getLoginStatus(async () => {
 
-      window.FB.login(callback, {
-        config_id: configId,
-        response_type: 'code',
-        override_default_response_type: true,
-        extras: {
-          setup: {},
-          featureType: '',
-          sessionInfoVersion: '3',
-        }
-      });
+    window.FB.login(callback, {
+      config_id: configId,
+      response_type: 'code',
+      override_default_response_type: true,
+      extras: {
+        setup: {}
+      }
     });
   } catch (error) {
     console.error('Error launching WhatsApp signup:', error);

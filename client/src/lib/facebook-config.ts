@@ -4,7 +4,7 @@ export const FACEBOOK_APP_CONFIG = {
 
   whatsAppConfigId: import.meta.env.VITE_WHATSAPP_CONFIG_ID || 'YOUR_WHATSAPP_CONFIG_ID',
 
-  apiVersion: 'v22.0', // Use v22.0 for consistency with backend
+  apiVersion: 'v24.0', // Use v24.0 for consistency with backend
 };
 
 export function validateFacebookConfig(): { isValid: boolean; missingFields: string[] } {

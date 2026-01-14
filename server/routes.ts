@@ -3360,7 +3360,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
 
 
 
-      const tokenResponse = await fetch('https://graph.facebook.com/v22.0/oauth/access_token', {
+      const tokenResponse = await fetch('https://graph.facebook.com/v24.0/oauth/access_token', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -3388,7 +3388,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         return res.status(400).json({ message: 'No access token received' });
       }
 
-      const wabaResponse = await fetch(`https://graph.facebook.com/v22.0/me/businesses?access_token=${accessToken}`);
+      const wabaResponse = await fetch(`https://graph.facebook.com/v24.0/me/businesses?access_token=${accessToken}`);
 
       if (!wabaResponse.ok) {
         const errorData = await wabaResponse.json();
@@ -3409,7 +3409,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       const wabaId = businessAccount.id;
 
       const phoneNumbersResponse = await fetch(
-        `https://graph.facebook.com/v22.0/${wabaId}/phone_numbers?access_token=${accessToken}`
+        `https://graph.facebook.com/v24.0/${wabaId}/phone_numbers?access_token=${accessToken}`
       );
 
       if (!phoneNumbersResponse.ok) {
