@@ -51,6 +51,59 @@ interface WhatsAppSignupData {
 }
 
 /**
+ * Check if third-party cookies are enabled
+ * @returns Promise that resolves to true if third-party cookies are enabled
+ */
+export async function checkThirdPartyCookies(): Promise<boolean> {
+  return new Promise((resolve) => {
+    // Create an iframe pointing to a Facebook domain to test cookie access
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.src = 'https://www.facebook.com/favicon.ico';
+    
+    let resolved = false;
+    
+    const timeout = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        document.body.removeChild(iframe);
+        // If we timeout, assume cookies might be blocked
+        resolve(false);
+      }
+    }, 3000);
+    
+    iframe.onload = () => {
+      if (!resolved) {
+        resolved = true;
+        clearTimeout(timeout);
+        
+        try {
+          // Try to access the iframe's content
+          // If third-party cookies are blocked, this might fail
+          const test = iframe.contentWindow;
+          document.body.removeChild(iframe);
+          resolve(true);
+        } catch (e) {
+          document.body.removeChild(iframe);
+          resolve(false);
+        }
+      }
+    };
+    
+    iframe.onerror = () => {
+      if (!resolved) {
+        resolved = true;
+        clearTimeout(timeout);
+        document.body.removeChild(iframe);
+        resolve(false);
+      }
+    };
+    
+    document.body.appendChild(iframe);
+  });
+}
+
+/**
  * Initialize Facebook SDK
  * @param appId Your Facebook App ID
  * @param version Graph API version (e.g., 'v22.0')
@@ -65,7 +118,8 @@ export function initFacebookSDK(appId: string, version = 'v22.0'): Promise<void>
           appId: appId,
           cookie: true,
           xfbml: true,
-          version: version
+          version: version,
+          autoLogAppEvents: true
         });
       }
       
@@ -92,7 +146,8 @@ export function initFacebookSDK(appId: string, version = 'v22.0'): Promise<void>
         appId: appId,
         cookie: true,
         xfbml: true,
-        version: version
+        version: version,
+        autoLogAppEvents: true
       });
       
 

@@ -11,7 +11,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
-import { initFacebookSDK, setupWhatsAppSignupListener, launchWhatsAppSignup, FacebookLoginResponse } from '@/lib/facebook-sdk';
+import { initFacebookSDK, setupWhatsAppSignupListener, launchWhatsAppSignup, FacebookLoginResponse, checkThirdPartyCookies } from '@/lib/facebook-sdk';
 import { FACEBOOK_APP_CONFIG, validateFacebookConfig } from '@/lib/facebook-config';
 
 interface Props {
@@ -31,6 +31,7 @@ export function WhatsAppEmbeddedSignup({ isOpen, onClose, onSuccess }: Props) {
   const [loading, setLoading] = useState(false);
   const [configValid, setConfigValid] = useState(false);
   const [configError, setConfigError] = useState<string | null>(null);
+  const [thirdPartyCookiesEnabled, setThirdPartyCookiesEnabled] = useState<boolean | null>(null);
 
   const [terms, setTerms] = useState<TermsState>({
     acceptTerms: false,
@@ -57,6 +58,18 @@ export function WhatsAppEmbeddedSignup({ isOpen, onClose, onSuccess }: Props) {
 
           setConfigValid(true);
           setConfigError(null);
+
+          // Check for third-party cookies
+          const cookiesEnabled = await checkThirdPartyCookies();
+          setThirdPartyCookiesEnabled(cookiesEnabled);
+          
+          if (!cookiesEnabled) {
+            toast({
+              title: "Third-Party Cookies Disabled",
+              description: "Facebook login requires third-party cookies. Please enable them in your browser settings for a smoother signup experience.",
+              variant: "destructive"
+            });
+          }
 
           await initFacebookSDK(FACEBOOK_APP_CONFIG.appId, FACEBOOK_APP_CONFIG.apiVersion);
           setSdkInitialized(true);
@@ -304,6 +317,25 @@ export function WhatsAppEmbeddedSignup({ isOpen, onClose, onSuccess }: Props) {
                   <strong>Note:</strong> This feature requires configuration of a Facebook App with WhatsApp Business permissions.
                   Contact your administrator to set up the app credentials.
                 </p>
+              </div>
+            )}
+
+            {thirdPartyCookiesEnabled === false && (
+              <div className="mt-3 p-3 text-amber-900 bg-amber-50 rounded border border-amber-300">
+                <div className="flex items-start">
+                  <i className="ri-error-warning-line mt-0.5 mr-2 text-lg"></i>
+                  <div className="flex-1">
+                    <p className="text-xs font-semibold mb-1">Third-Party Cookies May Be Blocked</p>
+                    <p className="text-xs mb-2">
+                      Facebook login requires third-party cookies. If signup fails, please enable cookies for facebook.com:
+                    </p>
+                    <ul className="text-xs list-disc pl-4 space-y-1">
+                      <li><strong>Chrome:</strong> Settings → Privacy → Cookies → Allow third-party cookies</li>
+                      <li><strong>Firefox:</strong> Settings → Privacy → Standard or Custom (allow tracking cookies)</li>
+                      <li><strong>Safari:</strong> Settings → Privacy → Uncheck "Prevent cross-site tracking"</li>
+                    </ul>
+                  </div>
+                </div>
               </div>
             )}
           </div>
