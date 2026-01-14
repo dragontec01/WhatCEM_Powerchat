@@ -11,7 +11,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
-import { initFacebookSDK, setupWhatsAppSignupListener, launchWhatsAppSignup, FacebookLoginResponse, checkThirdPartyCookies } from '@/lib/facebook-sdk';
+import { initFacebookSDK, setupWhatsAppSignupListener, launchWhatsAppSignup, FacebookLoginResponse } from '@/lib/facebook-sdk';
 import { FACEBOOK_APP_CONFIG, validateFacebookConfig } from '@/lib/facebook-config';
 
 interface Props {
@@ -31,7 +31,6 @@ export function WhatsAppEmbeddedSignup({ isOpen, onClose, onSuccess }: Props) {
   const [loading, setLoading] = useState(false);
   const [configValid, setConfigValid] = useState(false);
   const [configError, setConfigError] = useState<string | null>(null);
-  const [thirdPartyCookiesEnabled, setThirdPartyCookiesEnabled] = useState<boolean | null>(null);
 
   const [terms, setTerms] = useState<TermsState>({
     acceptTerms: false,
@@ -59,43 +58,20 @@ export function WhatsAppEmbeddedSignup({ isOpen, onClose, onSuccess }: Props) {
           setConfigValid(true);
           setConfigError(null);
 
-          // Check for third-party cookies
-          const cookiesEnabled = await checkThirdPartyCookies();
-          setThirdPartyCookiesEnabled(cookiesEnabled);
-          
-          if (!cookiesEnabled) {
-            toast({
-              title: "Third-Party Cookies Disabled",
-              description: "Facebook login requires third-party cookies. Please enable them in your browser settings for a smoother signup experience.",
-              variant: "destructive"
-            });
-          }
-
           await initFacebookSDK(FACEBOOK_APP_CONFIG.appId, FACEBOOK_APP_CONFIG.apiVersion);
           setSdkInitialized(true);
 
-          // Setup listener and store cleanup function
-          const cleanup = setupWhatsAppSignupListener((data) => {
-            console.log('Received WhatsApp signup postMessage:', data);
-            
+          setupWhatsAppSignupListener((data) => {
             if (data.wabaId && data.phoneNumberId) {
               handleSuccessfulSignup(data.wabaId, data.phoneNumberId);
             } else if (data.screen) {
-              setLoading(false);
               toast({
                 title: "Signup Incomplete",
-                description: `Signup was cancelled at the ${data.screen} screen. Please try again if needed.`,
+                description: `Signup was abandoned at the ${data.screen} screen. Please try again.`,
                 variant: "destructive"
               });
-            } else {
-              // Unknown postMessage event - just log it
-              console.log('Received postMessage without wabaId or screen info');
-              setLoading(false);
             }
           });
-
-          // Return cleanup function to be called when component unmounts
-          return cleanup;
 
         } catch (error) {
           console.error('Failed to initialize Facebook SDK:', error);
@@ -108,12 +84,7 @@ export function WhatsAppEmbeddedSignup({ isOpen, onClose, onSuccess }: Props) {
         }
       };
 
-      const cleanupPromise = initSdk();
-      
-      // Cleanup when component unmounts or dialog closes
-      return () => {
-        cleanupPromise?.then(cleanup => cleanup?.());
-      };
+      initSdk();
     }
   }, [isOpen, sdkInitialized, toast]);
 
@@ -132,40 +103,14 @@ export function WhatsAppEmbeddedSignup({ isOpen, onClose, onSuccess }: Props) {
   };
 
   const handleFacebookLoginResponse = (response: FacebookLoginResponse) => {
-    console.log('Facebook login response:', response);
-    
-    // If we have an auth code, exchange it immediately (for non-embedded signup flows)
+    console.log({response})
     if (response.authResponse && response.authResponse.code) {
       exchangeCodeForWhatsAppConnection(response.authResponse.code);
-      return;
-    }
-    
-    // For embedded signup, the initial callback often returns 'unknown' status immediately
-    // The actual result comes via postMessage, so we should NOT treat this as an error
-    if (response.status === 'unknown') {
-      console.log('Initial callback returned unknown status - this is normal for embedded signup');
-      console.log('Waiting for postMessage event with actual signup result...');
-      // Don't set loading to false or show error - the signup is still in progress
-      return;
-    }
-    
-    // Only treat it as an error if explicitly not authorized or failed
-    if (response.status === 'not_authorized' || !response.authResponse) {
+    } else {
       setLoading(false);
-      
-      let errorMessage = 'The WhatsApp Business signup process was cancelled or encountered an error.';
-      
-      if (response.status === 'not_authorized') {
-        errorMessage = 'You cancelled the signup or did not authorize the application. Please try again and grant the necessary permissions.';
-      } else if (!response.authResponse) {
-        errorMessage = 'No authorization received from Facebook. Please try again.';
-      }
-      
-      console.error('Signup failed:', { response, errorMessage });
-      
       toast({
         title: "Signup Cancelled",
-        description: errorMessage,
+        description: `The WhatsApp Business signup process was cancelled or encountered an error. ${JSON.stringify({response})}`,
         variant: "destructive"
       });
     }
@@ -345,25 +290,6 @@ export function WhatsAppEmbeddedSignup({ isOpen, onClose, onSuccess }: Props) {
                   <strong>Note:</strong> This feature requires configuration of a Facebook App with WhatsApp Business permissions.
                   Contact your administrator to set up the app credentials.
                 </p>
-              </div>
-            )}
-
-            {thirdPartyCookiesEnabled === false && (
-              <div className="mt-3 p-3 text-amber-900 bg-amber-50 rounded border border-amber-300">
-                <div className="flex items-start">
-                  <i className="ri-error-warning-line mt-0.5 mr-2 text-lg"></i>
-                  <div className="flex-1">
-                    <p className="text-xs font-semibold mb-1">Third-Party Cookies May Be Blocked</p>
-                    <p className="text-xs mb-2">
-                      Facebook login requires third-party cookies. If signup fails, please enable cookies for facebook.com:
-                    </p>
-                    <ul className="text-xs list-disc pl-4 space-y-1">
-                      <li><strong>Chrome:</strong> Settings → Privacy → Cookies → Allow third-party cookies</li>
-                      <li><strong>Firefox:</strong> Settings → Privacy → Standard or Custom (allow tracking cookies)</li>
-                      <li><strong>Safari:</strong> Settings → Privacy → Uncheck "Prevent cross-site tracking"</li>
-                    </ul>
-                  </div>
-                </div>
               </div>
             )}
           </div>

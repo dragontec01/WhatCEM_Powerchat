@@ -51,59 +51,6 @@ interface WhatsAppSignupData {
 }
 
 /**
- * Check if third-party cookies are enabled
- * @returns Promise that resolves to true if third-party cookies are enabled
- */
-export async function checkThirdPartyCookies(): Promise<boolean> {
-  return new Promise((resolve) => {
-    // Create an iframe pointing to a Facebook domain to test cookie access
-    const iframe = document.createElement('iframe');
-    iframe.style.display = 'none';
-    iframe.src = 'https://www.facebook.com/favicon.ico';
-    
-    let resolved = false;
-    
-    const timeout = setTimeout(() => {
-      if (!resolved) {
-        resolved = true;
-        document.body.removeChild(iframe);
-        // If we timeout, assume cookies might be blocked
-        resolve(false);
-      }
-    }, 3000);
-    
-    iframe.onload = () => {
-      if (!resolved) {
-        resolved = true;
-        clearTimeout(timeout);
-        
-        try {
-          // Try to access the iframe's content
-          // If third-party cookies are blocked, this might fail
-          const test = iframe.contentWindow;
-          document.body.removeChild(iframe);
-          resolve(true);
-        } catch (e) {
-          document.body.removeChild(iframe);
-          resolve(false);
-        }
-      }
-    };
-    
-    iframe.onerror = () => {
-      if (!resolved) {
-        resolved = true;
-        clearTimeout(timeout);
-        document.body.removeChild(iframe);
-        resolve(false);
-      }
-    };
-    
-    document.body.appendChild(iframe);
-  });
-}
-
-/**
  * Initialize Facebook SDK
  * @param appId Your Facebook App ID
  * @param version Graph API version (e.g., 'v22.0')
@@ -118,8 +65,7 @@ export function initFacebookSDK(appId: string, version = 'v22.0'): Promise<void>
           appId: appId,
           cookie: true,
           xfbml: true,
-          version: version,
-          autoLogAppEvents: true
+          version: version
         });
       }
       
@@ -146,8 +92,7 @@ export function initFacebookSDK(appId: string, version = 'v22.0'): Promise<void>
         appId: appId,
         cookie: true,
         xfbml: true,
-        version: version,
-        autoLogAppEvents: true
+        version: version
       });
       
 
@@ -176,28 +121,21 @@ export function initFacebookSDK(appId: string, version = 'v22.0'): Promise<void>
 /**
  * Setup event listener for WhatsApp signup events
  * @param callback Function to call when a WhatsApp signup event is received
- * @returns Cleanup function to remove the event listener
  */
-export function setupWhatsAppSignupListener(callback: (data: WhatsAppSignupData) => void): () => void {
-  const messageHandler = (event: MessageEvent) => {
+export function setupWhatsAppSignupListener(callback: (data: WhatsAppSignupData) => void) {
+  console.log('whatsappSetupcalled')
+  window.addEventListener('message', async (event) => {
     if (event.origin !== "https://www.facebook.com" && event.origin !== "https://web.facebook.com") return;
-    
+    console.log('Received message from origin:', {event});
     try {
       const data = JSON.parse(event.data);
       if (data.type === 'WA_EMBEDDED_SIGNUP') {
         callback(data);
       }
     } catch {
-      // Invalid JSON or non-WhatsApp message - ignore
-    }
-  };
 
-  window.addEventListener('message', messageHandler);
-  
-  // Return cleanup function
-  return () => {
-    window.removeEventListener('message', messageHandler);
-  };
+    }
+  });
 }
 
 /**
@@ -219,45 +157,31 @@ export async function launchWhatsAppSignup(
     throw new Error('WhatsApp Configuration ID is required. Please check your configuration.');
   }
 
+
   if (window.location.protocol !== 'https:') {
     console.error('Facebook SDK requires HTTPS. Current protocol:', window.location.protocol);
     throw new Error('WhatsApp signup requires HTTPS. Please access this application over HTTPS (https://) instead of HTTP.');
   }
 
+
   if (!window.FB || typeof window.FB.login !== 'function') {
     throw new Error('Facebook SDK is not properly initialized');
   }
 
-  console.log('Launching WhatsApp signup with config_id:', configId);
 
   try {
-    // Call FB.login directly without getLoginStatus wrapper
-    window.FB.login((response) => {
-      console.log('FB.login response:', response);
-      
-      // Add detailed logging for debugging
-      if (!response) {
-        console.error('No response from FB.login');
-      } else if (response.status === 'unknown') {
-        console.error('FB.login returned unknown status - possible causes:');
-        console.error('1. App domain not whitelisted in Facebook App settings');
-        console.error('2. Invalid config_id:', configId);
-        console.error('3. Third-party cookies blocked');
-        console.error('4. App not in live mode or missing permissions');
-      } else if (response.status === 'not_authorized') {
-        console.error('User cancelled or did not fully authorize');
-      }
-      
-      callback(response);
-    }, {
-      config_id: configId,
-      response_type: 'code',
-      override_default_response_type: true,
-      extras: {
-        setup: {},
-        featureType: '',
-        sessionInfoVersion: '3',
-      }
+    window.FB.getLoginStatus(async () => {
+
+      window.FB.login(callback, {
+        config_id: configId,
+        response_type: 'code',
+        override_default_response_type: true,
+        extras: {
+          setup: {},
+          featureType: '',
+          sessionInfoVersion: '3',
+        }
+      });
     });
   } catch (error) {
     console.error('Error launching WhatsApp signup:', error);
