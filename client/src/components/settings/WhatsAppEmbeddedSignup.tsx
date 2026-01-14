@@ -74,17 +74,28 @@ export function WhatsAppEmbeddedSignup({ isOpen, onClose, onSuccess }: Props) {
           await initFacebookSDK(FACEBOOK_APP_CONFIG.appId, FACEBOOK_APP_CONFIG.apiVersion);
           setSdkInitialized(true);
 
-          setupWhatsAppSignupListener((data) => {
+          // Setup listener and store cleanup function
+          const cleanup = setupWhatsAppSignupListener((data) => {
+            console.log('Received WhatsApp signup postMessage:', data);
+            
             if (data.wabaId && data.phoneNumberId) {
               handleSuccessfulSignup(data.wabaId, data.phoneNumberId);
             } else if (data.screen) {
+              setLoading(false);
               toast({
                 title: "Signup Incomplete",
-                description: `Signup was abandoned at the ${data.screen} screen. Please try again.`,
+                description: `Signup was cancelled at the ${data.screen} screen. Please try again if needed.`,
                 variant: "destructive"
               });
+            } else {
+              // Unknown postMessage event - just log it
+              console.log('Received postMessage without wabaId or screen info');
+              setLoading(false);
             }
           });
+
+          // Return cleanup function to be called when component unmounts
+          return cleanup;
 
         } catch (error) {
           console.error('Failed to initialize Facebook SDK:', error);
@@ -97,7 +108,12 @@ export function WhatsAppEmbeddedSignup({ isOpen, onClose, onSuccess }: Props) {
         }
       };
 
-      initSdk();
+      const cleanupPromise = initSdk();
+      
+      // Cleanup when component unmounts or dialog closes
+      return () => {
+        cleanupPromise?.then(cleanup => cleanup?.());
+      };
     }
   }, [isOpen, sdkInitialized, toast]);
 
@@ -118,17 +134,29 @@ export function WhatsAppEmbeddedSignup({ isOpen, onClose, onSuccess }: Props) {
   const handleFacebookLoginResponse = (response: FacebookLoginResponse) => {
     console.log('Facebook login response:', response);
     
+    // If we have an auth code, exchange it immediately (for non-embedded signup flows)
     if (response.authResponse && response.authResponse.code) {
       exchangeCodeForWhatsAppConnection(response.authResponse.code);
-    } else {
+      return;
+    }
+    
+    // For embedded signup, the initial callback often returns 'unknown' status immediately
+    // The actual result comes via postMessage, so we should NOT treat this as an error
+    if (response.status === 'unknown') {
+      console.log('Initial callback returned unknown status - this is normal for embedded signup');
+      console.log('Waiting for postMessage event with actual signup result...');
+      // Don't set loading to false or show error - the signup is still in progress
+      return;
+    }
+    
+    // Only treat it as an error if explicitly not authorized or failed
+    if (response.status === 'not_authorized' || !response.authResponse) {
       setLoading(false);
       
       let errorMessage = 'The WhatsApp Business signup process was cancelled or encountered an error.';
       
-      if (response.status === 'unknown') {
-        errorMessage = 'Failed to start signup. Please check: 1) Your domain is whitelisted in Facebook App settings, 2) Third-party cookies are enabled, 3) Your Facebook App is configured correctly.';
-      } else if (response.status === 'not_authorized') {
-        errorMessage = 'You did not authorize the application. Please try again and grant the necessary permissions.';
+      if (response.status === 'not_authorized') {
+        errorMessage = 'You cancelled the signup or did not authorize the application. Please try again and grant the necessary permissions.';
       } else if (!response.authResponse) {
         errorMessage = 'No authorization received from Facebook. Please try again.';
       }
@@ -136,7 +164,7 @@ export function WhatsAppEmbeddedSignup({ isOpen, onClose, onSuccess }: Props) {
       console.error('Signup failed:', { response, errorMessage });
       
       toast({
-        title: "Signup Failed",
+        title: "Signup Cancelled",
         description: errorMessage,
         variant: "destructive"
       });

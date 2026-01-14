@@ -176,9 +176,10 @@ export function initFacebookSDK(appId: string, version = 'v22.0'): Promise<void>
 /**
  * Setup event listener for WhatsApp signup events
  * @param callback Function to call when a WhatsApp signup event is received
+ * @returns Cleanup function to remove the event listener
  */
-export function setupWhatsAppSignupListener(callback: (data: WhatsAppSignupData) => void) {
-  window.addEventListener('message', (event) => {
+export function setupWhatsAppSignupListener(callback: (data: WhatsAppSignupData) => void): () => void {
+  const messageHandler = (event: MessageEvent) => {
     if (event.origin !== "https://www.facebook.com" && event.origin !== "https://web.facebook.com") return;
     
     try {
@@ -187,9 +188,16 @@ export function setupWhatsAppSignupListener(callback: (data: WhatsAppSignupData)
         callback(data);
       }
     } catch {
-
+      // Invalid JSON or non-WhatsApp message - ignore
     }
-  });
+  };
+
+  window.addEventListener('message', messageHandler);
+  
+  // Return cleanup function
+  return () => {
+    window.removeEventListener('message', messageHandler);
+  };
 }
 
 /**
