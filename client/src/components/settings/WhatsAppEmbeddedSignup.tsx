@@ -103,14 +103,28 @@ export function WhatsAppEmbeddedSignup({ isOpen, onClose, onSuccess }: Props) {
   };
 
   const handleFacebookLoginResponse = (response: FacebookLoginResponse) => {
-    console.log({response})
+    console.log('Facebook login response:', response);
+    
     if (response.authResponse && response.authResponse.code) {
       exchangeCodeForWhatsAppConnection(response.authResponse.code);
     } else {
       setLoading(false);
+      
+      let errorMessage = 'The WhatsApp Business signup process was cancelled or encountered an error.';
+      
+      if (response.status === 'unknown') {
+        errorMessage = 'Failed to start signup. Please check: 1) Your domain is whitelisted in Facebook App settings, 2) Third-party cookies are enabled, 3) Your Facebook App is configured correctly.';
+      } else if (response.status === 'not_authorized') {
+        errorMessage = 'You did not authorize the application. Please try again and grant the necessary permissions.';
+      } else if (!response.authResponse) {
+        errorMessage = 'No authorization received from Facebook. Please try again.';
+      }
+      
+      console.error('Signup failed:', { response, errorMessage });
+      
       toast({
-        title: "Signup Cancelled",
-        description: `The WhatsApp Business signup process was cancelled or encountered an error. ${JSON.stringify({response})}`,
+        title: "Signup Failed",
+        description: errorMessage,
         variant: "destructive"
       });
     }

@@ -156,31 +156,45 @@ export async function launchWhatsAppSignup(
     throw new Error('WhatsApp Configuration ID is required. Please check your configuration.');
   }
 
-
   if (window.location.protocol !== 'https:') {
     console.error('Facebook SDK requires HTTPS. Current protocol:', window.location.protocol);
     throw new Error('WhatsApp signup requires HTTPS. Please access this application over HTTPS (https://) instead of HTTP.');
   }
 
-
   if (!window.FB || typeof window.FB.login !== 'function') {
     throw new Error('Facebook SDK is not properly initialized');
   }
 
+  console.log('Launching WhatsApp signup with config_id:', configId);
 
   try {
-    window.FB.getLoginStatus(() => {
-
-      window.FB.login(callback, {
-        config_id: configId,
-        response_type: 'code',
-        override_default_response_type: true,
-        extras: {
-          setup: {},
-          featureType: '',
-          sessionInfoVersion: '3',
-        }
-      });
+    // Call FB.login directly without getLoginStatus wrapper
+    window.FB.login((response) => {
+      console.log('FB.login response:', response);
+      
+      // Add detailed logging for debugging
+      if (!response) {
+        console.error('No response from FB.login');
+      } else if (response.status === 'unknown') {
+        console.error('FB.login returned unknown status - possible causes:');
+        console.error('1. App domain not whitelisted in Facebook App settings');
+        console.error('2. Invalid config_id:', configId);
+        console.error('3. Third-party cookies blocked');
+        console.error('4. App not in live mode or missing permissions');
+      } else if (response.status === 'not_authorized') {
+        console.error('User cancelled or did not fully authorize');
+      }
+      
+      callback(response);
+    }, {
+      config_id: configId,
+      response_type: 'code',
+      override_default_response_type: true,
+      extras: {
+        setup: {},
+        featureType: '',
+        sessionInfoVersion: '3',
+      }
     });
   } catch (error) {
     console.error('Error launching WhatsApp signup:', error);
