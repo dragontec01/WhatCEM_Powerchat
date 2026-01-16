@@ -48,6 +48,7 @@ interface WhatsAppSignupData {
   wabaId?: string;
   phoneNumberId?: string;
   screen?: string;
+  code?: string; // Authorization code from Facebook
 }
 
 /**
@@ -123,25 +124,56 @@ export function initFacebookSDK(appId: string, version = 'v24.0'): Promise<void>
  * @param callback Function to call when a WhatsApp signup event is received
  */
 export function setupWhatsAppSignupListener(callback: (data: WhatsAppSignupData) => void) {
-  console.log('whatsappSetupcalled')
-  window.addEventListener('message', async (event) => {
+  console.log('WhatsApp signup listener setup');
+  
+  window.addEventListener('message', (event) => {
+    // Only accept messages from Facebook
     if (!event.origin.endsWith("facebook.com")) return;
-    console.log('Received message from origin:', {event});
+    
     try {
-      const data = JSON.parse(event.data);
-      if (data.type === 'WA_EMBEDDED_SIGNUP') {
-        callback(data);
-      } else {
-        callback({
-          ...data,
-          screen: data.screen || 'unknown_screen'
-        });
+      let parsedData: any;
+      
+      // Check if data is a URL-encoded string (new Facebook format)
+      if (typeof event.data === 'string' && event.data.includes('code=')) {
+        console.log('Detected URL-encoded format');
+        
+        // Parse URL-encoded string
+        const params = new URLSearchParams(event.data);
+        const code = params.get('code');
+        
+        if (code) {
+          console.log('Extracted authorization code from postMessage');
+          
+          // Return the code in a format the component expects
+          callback({
+            type: 'WA_EMBEDDED_SIGNUP',
+            code: code
+          } as any);
+          return;
+        }
       }
-    } catch(error) {
-      callback({
-        type: 'WA_EMBEDDED_SIGNUP',
-        screen: error instanceof Error ? error.message : 'unknown_error'
-      })
+      
+      // Try to parse as JSON (old Facebook format or custom messages)
+      if (typeof event.data === 'string') {
+        try {
+          parsedData = JSON.parse(event.data);
+        } catch {
+          // Not JSON, might be other Facebook message
+          console.log('Could not parse as JSON, ignoring');
+          parsedData = event.data;
+        }
+      } else {
+        parsedData = event.data;
+      }
+      
+      // Handle embedded signup messages
+      if (parsedData && parsedData.type === 'WA_EMBEDDED_SIGNUP') {
+        console.log('Received WA_EMBEDDED_SIGNUP message');
+        callback(parsedData);
+      }
+      
+    } catch (error) {
+      console.error('Error processing message:', error);
     }
   });
 }
@@ -184,7 +216,9 @@ export async function launchWhatsAppSignup(
       response_type: 'code',
       override_default_response_type: true,
       extras: {
-        setup: {}
+        setup: {},
+        featureType: '',
+        sessionInfoVersion: '3'
       }
     });
   } catch (error) {

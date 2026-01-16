@@ -62,9 +62,25 @@ export function WhatsAppEmbeddedSignup({ isOpen, onClose, onSuccess }: Props) {
           setSdkInitialized(true);
 
           setupWhatsAppSignupListener((data) => {
+            console.log('Received WhatsApp signup event:', data);
+            
+            // Handle authorization code from postMessage (new format)
+            if (data.code) {
+              console.log('Received authorization code via postMessage');
+              exchangeCodeForWhatsAppConnection(data.code);
+              return;
+            }
+            
+            // Handle wabaId and phoneNumberId (old format)
             if (data.wabaId && data.phoneNumberId) {
+              console.log('Received wabaId and phoneNumberId via postMessage');
               handleSuccessfulSignup(data.wabaId, data.phoneNumberId);
-            } else if (data.screen) {
+              return;
+            }
+            
+            // Handle cancellation/abandonment
+            if (data.screen) {
+              setLoading(false);
               toast({
                 title: "Signup Incomplete",
                 description: `Signup was abandoned at the ${data.screen} screen. Please try again.`,
