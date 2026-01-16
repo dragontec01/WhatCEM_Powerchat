@@ -35,7 +35,7 @@ export function setupSecurityMiddleware(app: any) {
       },
     },
     crossOriginEmbedderPolicy: false,
-    crossOriginOpenerPolicy: { policy: "unsafe-none" }, // Required for Facebook OAuth popup to communicate via postMessage
+    crossOriginOpenerPolicy: false, // Required for Facebook OAuth popup to communicate via postMessage
     xFrameOptions: false, 
     hsts: {
       maxAge: 31536000,
@@ -44,11 +44,6 @@ export function setupSecurityMiddleware(app: any) {
     }
   }));
 
-  // Explicitly remove COOP header to allow Facebook OAuth popup communication
-  app.use((req: Request, res: Response, next: NextFunction) => {
-    res.removeHeader('Cross-Origin-Opener-Policy');
-    next();
-  });
 
 
 
