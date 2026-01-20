@@ -3347,11 +3347,11 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
 
   app.post('/api/channel-connections/whatsapp-embedded-signup', ensureAuthenticated, ensureActiveSubscription, async (req: Request, res: Response) => {
     try {
-      const { code } = req.body;
+      const { code, wabaId } = req.body;
       const user = req.user as any;
 
-      if (!code) {
-        return res.status(400).json({ message: 'Authorization code is required' });
+      if (!code || !wabaId) {
+        return res.status(400).json({ message: 'Authorization code and WABA ID are required' });
       }
 
       if (!user?.id) {
@@ -3369,6 +3369,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
           client_id: process.env.FACEBOOK_APP_ID || '',
           client_secret: process.env.FACEBOOK_APP_SECRET || '',
           code: code,
+          grant_type: 'authorization_code'
         }),
       });
 
@@ -3388,10 +3389,10 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         return res.status(400).json({ message: 'No access token received' });
       }
 
-      const wabaResponse = await fetch(`https://graph.facebook.com/v24.0/me/businesses?access_token=${accessToken}`);
+      const businessResponse = await fetch(`https://graph.facebook.com/v24.0/me?access_token=${accessToken}`);
 
-      if (!wabaResponse.ok) {
-        const errorData = await wabaResponse.json();
+      if (!businessResponse.ok) {
+        const errorData = await businessResponse.json();
         console.error('Failed to get business accounts:', errorData);
         return res.status(400).json({
           message: 'Failed to retrieve business account information',
@@ -3399,14 +3400,11 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         });
       }
 
-      const wabaData = await wabaResponse.json();
+      const businessAccount = await businessResponse.json();
 
-      if (!wabaData.data || wabaData.data.length === 0) {
-        return res.status(400).json({ message: 'No WhatsApp Business accounts found' });
+      if (!businessAccount) {
+        return res.status(400).json({ message: 'No WhatsApp Business accounts found', accessToken });
       }
-
-      const businessAccount = wabaData.data[0];
-      const wabaId = businessAccount.id;
 
       const phoneNumbersResponse = await fetch(
         `https://graph.facebook.com/v24.0/${wabaId}/phone_numbers?access_token=${accessToken}`
@@ -3448,7 +3446,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
           accessToken: accessToken,
           phoneNumber: phoneNumber.display_phone_number,
           verifiedName: phoneNumber.verified_name || businessAccount.name,
-          businessAccountId: businessAccount.id,
+          businessAccountId: businessAccount.client_business_id,
           businessAccountName: businessAccount.name
         }
       });

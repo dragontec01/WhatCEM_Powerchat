@@ -8,6 +8,7 @@ declare global {
         autoLogAppEvents?: boolean;
         cookie?: boolean;
         xfbml: boolean;
+        status?: boolean;
         version: string;
       }) => void;
       login: (
@@ -18,8 +19,8 @@ declare global {
           override_default_response_type: boolean;
           extras: {
             setup: Record<string, any>;
-            featureType: string;
-            sessionInfoVersion: string;
+            featureType?: string;
+            sessionInfoVersion?: string;
           }
         }
       ) => void;
@@ -43,10 +44,15 @@ export interface FacebookLoginResponse {
   status: 'connected' | 'not_authorized' | 'unknown';
 }
 
-interface WhatsAppSignupData {
+export interface WhatsAppSignupData {
   type: 'WA_EMBEDDED_SIGNUP';
-  wabaId?: string;
-  phoneNumberId?: string;
+  data?: {
+    waba_id?: string;
+    phone_number_id?: string;
+    business_id?: string;
+    page_ids?: string[];
+    waba_ids?: string[];
+  };
   screen?: string;
   code?: string; // Authorization code from Facebook
 }
@@ -65,8 +71,8 @@ export function initFacebookSDK(appId: string, version = 'v24.0'): Promise<void>
         window.FB.init({
           appId: appId,
           autoLogAppEvents: true,
-          cookie: true,
           xfbml: true,
+          status: true,
           version: version
         });
       }
@@ -106,8 +112,8 @@ export function initFacebookSDK(appId: string, version = 'v24.0'): Promise<void>
       window.FB.init({
         appId: appId,
         autoLogAppEvents: true,
-        cookie: true,
         xfbml: true,
+        status: true,
         version: version
       });
 
@@ -129,10 +135,9 @@ export function setupWhatsAppSignupListener(callback: (data: WhatsAppSignupData)
   window.addEventListener('message', (event) => {
     // Only accept messages from Facebook
     if (!event.origin.endsWith("facebook.com")) return;
-    
     try {
       let parsedData: any;
-      
+      console.log({eventFromListener: event})
       // Check if data is a URL-encoded string (new Facebook format)
       if (typeof event.data === 'string' && event.data.includes('code=')) {
         console.log('Detected URL-encoded format');
@@ -156,6 +161,7 @@ export function setupWhatsAppSignupListener(callback: (data: WhatsAppSignupData)
       // Try to parse as JSON (old Facebook format or custom messages)
       if (typeof event.data === 'string') {
         try {
+          console.log('Detected JSON string format');
           parsedData = JSON.parse(event.data);
         } catch {
           // Not JSON, might be other Facebook message
@@ -216,9 +222,7 @@ export async function launchWhatsAppSignup(
       response_type: 'code',
       override_default_response_type: true,
       extras: {
-        setup: {},
-        featureType: '',
-        sessionInfoVersion: '3'
+        setup: {}
       }
     });
   } catch (error) {

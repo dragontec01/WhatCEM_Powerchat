@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { 
   Dialog, 
@@ -31,6 +31,7 @@ export function WhatsAppEmbeddedSignup({ isOpen, onClose, onSuccess }: Props) {
   const [loading, setLoading] = useState(false);
   const [configValid, setConfigValid] = useState(false);
   const [configError, setConfigError] = useState<string | null>(null);
+  const businessCodeRef = useRef<string | null>(null);
 
   const [terms, setTerms] = useState<TermsState>({
     acceptTerms: false,
@@ -61,25 +62,49 @@ export function WhatsAppEmbeddedSignup({ isOpen, onClose, onSuccess }: Props) {
           await initFacebookSDK(FACEBOOK_APP_CONFIG.appId, FACEBOOK_APP_CONFIG.apiVersion);
           setSdkInitialized(true);
 
-          setupWhatsAppSignupListener((data) => {
-            console.log('Received WhatsApp signup event:', data);
+          setupWhatsAppSignupListener(async (data) => {
+            console.log('Received WhatsApp signup event');
             
             // Handle authorization code from postMessage (new format)
             if (data.code) {
               console.log('Received authorization code via postMessage');
-              exchangeCodeForWhatsAppConnection(data.code);
               return;
             }
             
             // Handle wabaId and phoneNumberId (old format)
-            if (data.wabaId && data.phoneNumberId) {
+            else if (data?.data?.waba_id && data?.data?.phone_number_id ) {
+              // wait until businessCode is set
+              await new Promise(resolve => {
+                const checkCode = () => {
+                  if (businessCodeRef.current) {
+                    resolve(true);
+                  } else {
+                    setTimeout(checkCode, 300);
+                  }
+                };
+                checkCode();
+              });
               console.log('Received wabaId and phoneNumberId via postMessage');
-              handleSuccessfulSignup(data.wabaId, data.phoneNumberId);
+              try {
+                await exchangeCodeForWhatsAppConnection(businessCodeRef.current as string, data.data.waba_id);
+                toast({
+                  title: "Connection Successful",
+                  description: "Your WhatsApp Business account has been connected successfully.",
+                });
+              } catch (error) {
+                console.error('Error exchanging code for WhatsApp connection:', error);
+                toast({
+                  title: "Connection Error",
+                  description: "Failed to connect your WhatsApp Business account by exchanging the authorization code.\nRetrying with direct signup...",
+                  variant: "destructive"
+                });
+                await handleSuccessfulSignup(data?.data?.waba_id, data?.data?.phone_number_id);
+              }
               return;
             }
             
             // Handle cancellation/abandonment
-            if (data.screen) {
+            else {
               setLoading(false);
               toast({
                 title: "Signup Incomplete",
@@ -119,9 +144,12 @@ export function WhatsAppEmbeddedSignup({ isOpen, onClose, onSuccess }: Props) {
   };
 
   const handleFacebookLoginResponse = (response: FacebookLoginResponse) => {
-    console.log({response})
     if (response.authResponse && response.authResponse.code) {
-      exchangeCodeForWhatsAppConnection(response.authResponse.code);
+      businessCodeRef.current = response.authResponse.code;
+      toast({
+        title: "Signup Successful",
+        description: "You have successfully completed the WhatsApp Business signup process. Connecting your account...",
+      });
     } else {
       setLoading(false);
       toast({
@@ -132,7 +160,7 @@ export function WhatsAppEmbeddedSignup({ isOpen, onClose, onSuccess }: Props) {
     }
   };
 
-  const exchangeCodeForWhatsAppConnection = async (code: string) => {
+  const exchangeCodeForWhatsAppConnection = async (code: string, wabaId: string) => {
     try {
       const response = await fetch('/api/channel-connections/whatsapp-embedded-signup', {
         method: 'POST',
@@ -140,7 +168,8 @@ export function WhatsAppEmbeddedSignup({ isOpen, onClose, onSuccess }: Props) {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          code: code
+          code,
+          wabaId
         })
       });
       
