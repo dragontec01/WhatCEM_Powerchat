@@ -137,7 +137,6 @@ export function setupWhatsAppSignupListener(callback: (data: WhatsAppSignupData)
     if (!event.origin.endsWith("facebook.com")) return;
     try {
       let parsedData: any;
-      console.log({eventFromListener: event})
       // Check if data is a URL-encoded string (new Facebook format)
       if (typeof event.data === 'string' && event.data.includes('code=')) {
         console.log('Detected URL-encoded format');

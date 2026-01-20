@@ -3438,7 +3438,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         companyId: user.companyId,
         channelType: 'whatsapp_official',
         accountId: wabaId,
-        accountName: `WhatsApp Business - ${phoneNumber.display_phone_number}`,
+        accountName: `WhatsApp Business - ${phoneNumber.verified_name || phoneNumber.display_phone_number}`,
         status: 'connected',
         connectionData: {
           phoneNumberId: phoneNumberId,
