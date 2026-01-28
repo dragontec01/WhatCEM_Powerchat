@@ -3407,7 +3407,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       }
 
       const phoneNumbersResponse = await fetch(
-        `https://graph.facebook.com/v24.0/${wabaId}/phone_numbers?access_token=${accessToken}`
+        `https://graph.facebook.com/v24.0/${wabaId}/phone_numbers?access_token=${accessToken}&&fields=id,cc,country_dial_code,display_phone_number,verified_name,status,quality_rating,search_visibility,platform_type,code_verification_status`
       );
 
       if (!phoneNumbersResponse.ok) {
@@ -3428,6 +3428,38 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       const phoneNumber = phoneNumbersData.data[0];
       const phoneNumberId = phoneNumber.id;
 
+
+      if(phoneNumber.code_verification_status !== "VERIFIED") {
+        return res.status(400).json({ message: 'Phone number needs to be verified first' })
+      }
+
+      if(phoneNumber.status !== "CONNECTED") {
+        // Code made with year and month numbers
+          const pinCode = new Date().getFullYear().toString() + (new Date().getMonth() + 1).toString().padStart(2, '0');
+          const registerResponse = await fetch(`https://graph.facebook.com/v24.0/${wabaId}/register`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${accessToken}`
+            },
+            body: JSON.stringify({
+              messaging_product: 'whatsapp',
+              pin: pinCode
+            })
+          });
+
+          if (!registerResponse.ok) {
+            const errorData = await registerResponse.json();
+            console.error('Failed to register phone number:', errorData);
+            return res.status(400).json({
+              message: 'Failed to register phone number. Make sure to verify it using the PIN sent via WhatsApp.',
+              error: errorData
+            });
+          }
+
+          const registerData = await registerResponse.json();
+          logger.info('whatsapp-embedded-signup', `Phone number registration made: ${JSON.stringify(registerData)}\nPin used: ${pinCode}`);
+      }
 
       if (!user.companyId) {
         return res.status(400).json({ message: 'Company ID is required for multi-tenant security' });
