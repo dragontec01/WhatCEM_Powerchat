@@ -618,7 +618,6 @@ export async function sendTemplateMessage(
       templatePayload.template.components = components;
     }
 
-
     const response = await axios.post(
       `${WHATSAPP_GRAPH_URL}/${WHATSAPP_API_VERSION}/${phoneNumberId}/messages`,
       templatePayload,

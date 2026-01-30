@@ -12,6 +12,7 @@ import { registerWebhookRoutes } from "./webhook-routes";
 import "./services/message-scheduler"; // Import message scheduler (but don't auto-start)
 import { licenseValidator } from "./services/license-validator";
 import { ensureLicenseValid } from "./middleware/license-guard";
+import { ChannelConnection } from "@shared/db/schema";
 
 
 dotenv.config();
@@ -411,13 +412,14 @@ app.use((req, res, next) => {
           logger.error('startup', '❌ Error creating/checking default groups and assigns:', error);
         }
         // Try flow-exec to be executed
-        /* try {
+        try {
           const FlowExecutor = (await import('./services/flow-executor')).default;
           const {storage} = await import('./storage');
-          const contactToTest = await storage.getContact(15);
-          const [conversation] = await storage.getConversationsByContact(15);
-          const [messageToTest] = await storage.getMessagesByConversation(conversation.id);
-          const [channelConnection] = await storage.getChannelConnectionsByCompany(conversation.companyId as number);
+          const contactToTest = await storage.getContact(69);
+          const [conversation] = await storage.getConversationsByContact(69);
+          const [messageToTest] = await storage.getMessagesByConversation(conversation?.id);
+          const channelConnection = await storage.getChannelConnectionsByCompany(conversation.companyId as number);
+          const connectionToUse = channelConnection.find(cc => cc.id === 69);
           logger.info('startup', 'Executing test flow at startup...');
           await FlowExecutor.executeUpdatePipelineStageNode(
             { data: {
@@ -428,12 +430,12 @@ app.use((req, res, next) => {
             messageToTest,
             conversation,
             contactToTest as Contact,
-            channelConnection
+            connectionToUse as ChannelConnection
           );
           logger.info('startup', '✅ Test flow executed successfully at startup');
         } catch (error) {
-          logger.error('startup', '❌ Error creating/checking default groups and assigns:', error);
-        } */
+          logger.error('startup', '❌ Error executing test flow at startup:', error);
+        }
       } catch (error) {
         logger.error('startup', 'Error during service initialization', error);
       }

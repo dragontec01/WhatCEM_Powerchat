@@ -11118,7 +11118,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       }
 
       let companyPlan;
-
+      console.log({company});
       if (company.planId) {
         companyPlan = await storage.getPlan(company.planId);
       }
@@ -11129,7 +11129,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       }
 
       if (!companyPlan) {
-        return res.status(403).json({ message: 'Company plan not found' });
+        return res.status(403).json({ message: 'Company plan not found' + company.planId });
       }
 
       const companyFlows = await storage.getFlowsByCompany(company.id);

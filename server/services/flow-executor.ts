@@ -3906,7 +3906,7 @@ class FlowExecutor extends EventEmitter {
         }
       };
 
-      if (extendedMessage.flowContext && extendedMessage.flowContext.availabilityData) {
+      if (extendedMessage?.flowContext && extendedMessage?.flowContext?.availabilityData) {
         return extendedMessage.flowContext.availabilityData;
       }
 
@@ -3938,8 +3938,8 @@ class FlowExecutor extends EventEmitter {
       };
 
       const messageVars: Record<string, string> = {
-        'message.content': message.content || '',
-        'message.type': message.type || '',
+        'message.content': message?.content || '',
+        'message.type': message?.type || '',
       };
 
       const calendarVars: Record<string, string> = {
@@ -9063,6 +9063,9 @@ ${eventResult.eventLink ? `\nView event: ${eventResult.eventLink}` : ''}`;
       throw new Error('User must be associated with a company to create deals');
     }
 
+    const whatsAppOfficialService = await import('./channels/whatsapp-official');
+    const TEMPLATE_NAME = 'notify_whatcem_user'
+    const TEMPLATE_LANGUAGE = 'es';
 
 
     const existingActiveDeal = await storage.getActiveDealByContact(contact.id, user.companyId);
@@ -9072,13 +9075,13 @@ ${eventResult.eventLink ? `\nView event: ${eventResult.eventLink}` : ''}`;
       const updates: any = {};
       let hasUpdates = false;
 
-      const dealTitle = this.replaceVariables(data.dealTitle || `${contact.name} - New Deal`, message, contact);
+      const dealTitle = this.replaceVariables(data?.dealTitle || `${contact.name} - New Deal`, message, contact);
       if (dealTitle && dealTitle !== existingActiveDeal.title) {
         updates.title = dealTitle;
         hasUpdates = true;
       }
 
-      const dealValue = data.dealValue ? parseInt(this.replaceVariables(data.dealValue, message, contact)) : null;
+      const dealValue = data.dealValue ? parseInt(this.replaceVariables(data?.dealValue, message, contact)) : null;
       if (dealValue && dealValue !== existingActiveDeal.value) {
         updates.value = dealValue;
         hasUpdates = true;
@@ -9120,7 +9123,7 @@ ${eventResult.eventLink ? `\nView event: ${eventResult.eventLink}` : ''}`;
         }
       }
       
-      logger.info('Creation Flow Executor', `Prevented duplicate deal creation for contact ${contact.id}`);
+      
       if (hasUpdates) {
         const updatedDeal = await storage.updateDeal(existingActiveDeal.id, updates);
 
@@ -9144,12 +9147,32 @@ ${eventResult.eventLink ? `\nView event: ${eventResult.eventLink}` : ''}`;
 
         return existingActiveDeal;
       }
+
+      logger.info('Creation Flow Executor', `Prevented duplicate deal creation for contact ${contact.id}`);
+      if(user.whatsappNumber) {
+        logger.info('Creation Flow Executor', `Sending WhatsApp Business message to user ${user.id} about existing active deal ${existingActiveDeal.id}`);
+        await whatsAppOfficialService.sendTemplateMessage(
+          channelConnection.id,
+          channelConnection.userId,
+          channelConnection.companyId as number,
+          user.whatsappNumber,
+          TEMPLATE_NAME,
+          TEMPLATE_LANGUAGE,
+          [{
+            type: 'body',
+            parameters: [{
+              type: 'text',
+              text: user.fullName || user.whatsappNumber || 'Usuario'
+            }]
+          }],
+        );
+      }
     }
 
     channelConnection = assignUserRandomAvailable.channelConnection;
 
 
-    const dealTitle = this.replaceVariables(data.dealTitle || `${contact.name} - New Deal`, message, contact);
+    const dealTitle = this.replaceVariables(data?.dealTitle || `${contact.name} - New Deal`, message, contact);
     const dealValue = data.dealValue ? parseInt(this.replaceVariables(data.dealValue, message, contact)) : null;
     const dealPriority = data.dealPriority || 'medium';
     const dealDescription = this.replaceVariables(data.dealDescription || '', message, contact);
@@ -9182,16 +9205,23 @@ ${eventResult.eventLink ? `\nView event: ${eventResult.eventLink}` : ''}`;
         }
       });
 
-      const whatsAppOfficialService = await import('./channels/whatsapp-official');
 
       if(user.whatsappNumber) {
         logger.info('Creation Flow Executor', `Sending WhatsApp Business message to user ${user.id} about existing active deal ${newDeal.id}`);
-        await whatsAppOfficialService.sendWhatsAppBusinessMessage(
+        await whatsAppOfficialService.sendTemplateMessage(
           channelConnection.id,
           channelConnection.userId,
           channelConnection.companyId as number,
           user.whatsappNumber,
-          `¡Hola ${user.fullName}! tienes un nuevo trato activo con ${contact.name}.\nPuedes gestionarlo aquí: ${process.env.DOMAIN}/deals/${newDeal.id}`,
+          TEMPLATE_NAME,
+          TEMPLATE_LANGUAGE,
+          [{
+            type: 'body',
+            parameters: [{
+              type: 'text',
+              text: user.fullName || user.whatsappNumber || 'Usuario'
+            }]
+          }],
         );
       }
 
