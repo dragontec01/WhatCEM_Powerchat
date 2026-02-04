@@ -9123,6 +9123,25 @@ ${eventResult.eventLink ? `\nView event: ${eventResult.eventLink}` : ''}`;
         }
       }
       
+      logger.info('Creation Flow Executor', `Prevented duplicate deal creation for contact ${contact.id}`);
+      if(user.whatsappNumber) {
+        logger.info('Creation Flow Executor', `Sending WhatsApp Business message to user ${user.id} about existing active deal ${existingActiveDeal.id}`);
+        await whatsAppOfficialService.sendTemplateMessage(
+          channelConnection.id,
+          channelConnection.userId,
+          channelConnection.companyId as number,
+          user.whatsappNumber,
+          TEMPLATE_NAME,
+          TEMPLATE_LANGUAGE,
+          [{
+            type: 'body',
+            parameters: [{
+              type: 'text',
+              text: user.fullName || user.whatsappNumber || 'Usuario'
+            }]
+          }],
+        );
+      }
       
       if (hasUpdates) {
         const updatedDeal = await storage.updateDeal(existingActiveDeal.id, updates);
@@ -9148,25 +9167,6 @@ ${eventResult.eventLink ? `\nView event: ${eventResult.eventLink}` : ''}`;
         return existingActiveDeal;
       }
 
-      logger.info('Creation Flow Executor', `Prevented duplicate deal creation for contact ${contact.id}`);
-      if(user.whatsappNumber) {
-        logger.info('Creation Flow Executor', `Sending WhatsApp Business message to user ${user.id} about existing active deal ${existingActiveDeal.id}`);
-        await whatsAppOfficialService.sendTemplateMessage(
-          channelConnection.id,
-          channelConnection.userId,
-          channelConnection.companyId as number,
-          user.whatsappNumber,
-          TEMPLATE_NAME,
-          TEMPLATE_LANGUAGE,
-          [{
-            type: 'body',
-            parameters: [{
-              type: 'text',
-              text: user.fullName || user.whatsappNumber || 'Usuario'
-            }]
-          }],
-        );
-      }
     }
 
     channelConnection = assignUserRandomAvailable.channelConnection;
