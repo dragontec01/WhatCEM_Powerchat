@@ -17,7 +17,7 @@ const eventEmitter = new EventEmitter();
 
 eventEmitter.setMaxListeners(50);
 
-const WHATSAPP_API_VERSION = 'v22.0';
+const WHATSAPP_API_VERSION = 'v24.0';
 const WHATSAPP_GRAPH_URL = 'https://graph.facebook.com';
 
 const MEDIA_DIR = path.join(process.cwd(), 'public', 'media');
@@ -617,7 +617,6 @@ export async function sendTemplateMessage(
     if (components && components.length > 0) {
       templatePayload.template.components = components;
     }
-
 
     const response = await axios.post(
       `${WHATSAPP_GRAPH_URL}/${WHATSAPP_API_VERSION}/${phoneNumberId}/messages`,

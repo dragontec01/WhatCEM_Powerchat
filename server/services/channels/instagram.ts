@@ -677,7 +677,7 @@ export function getConnectionHealth(connectionId: number): {
   };
 }
 
-const INSTAGRAM_API_VERSION = 'v22.0';
+const INSTAGRAM_API_VERSION = 'v24.0';
 const INSTAGRAM_GRAPH_URL = 'https://graph.facebook.com';
 
 

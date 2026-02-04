@@ -34,7 +34,8 @@ export function setupSecurityMiddleware(app: any) {
         manifestSrc: ["'self'"],
       },
     },
-    crossOriginEmbedderPolicy: false, 
+    crossOriginEmbedderPolicy: false,
+    crossOriginOpenerPolicy: false, // Required for Facebook OAuth popup to communicate via postMessage
     xFrameOptions: false, 
     hsts: {
       maxAge: 31536000,

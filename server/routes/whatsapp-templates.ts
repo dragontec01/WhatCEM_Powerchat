@@ -304,7 +304,7 @@ router.post('/', ensureAuthenticated, requirePermission(PERMISSIONS.MANAGE_TEMPL
 
     const connectionData = whatsappChannel.connectionData as any;
     const wabaId = connectionData.wabaId || connectionData.businessAccountId || connectionData.waba_id;
-    const accessToken = connectionData.accessToken || connectionData.access_token;
+    const accessToken = connectionData.accessToken || connectionData.access_token || whatsappChannel.accessToken;
     const phoneNumberId = connectionData.phoneNumberId || connectionData.phone_number_id;
     const appId = connectionData.appId || connectionData.app_id;
 
@@ -833,7 +833,7 @@ router.post('/sync-from-meta', ensureAuthenticated, async (req, res) => {
 
     const connectionData = whatsappChannel[0].connectionData as ChannelConnectionData;
     const wabaId = connectionData.wabaId || connectionData.businessAccountId || connectionData.waba_id;
-    const accessToken = connectionData.accessToken || connectionData.access_token;
+    const accessToken = connectionData.accessToken || connectionData.access_token || whatsappChannel[0].accessToken;
 
     if (!wabaId || !accessToken) {
       return res.status(400).json({

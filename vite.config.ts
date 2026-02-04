@@ -7,8 +7,15 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const backendPort = env.PORT || '9000';
   const isProduction = mode === 'production';
+  
+  // For production builds, use instance-specific .env if INSTANCE_NAME is set
+  const instanceName = process.env.INSTANCE_NAME;
+  const envDir = instanceName 
+    ? path.resolve(import.meta.dirname, 'instances', instanceName)
+    : process.cwd();
 
   return {
+  envDir: envDir,
   plugins: [
     react(),
     tailwindcss(),
@@ -122,6 +129,7 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
+    allowedHosts: isProduction ? [] : true,
   },
   };
 });

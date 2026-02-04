@@ -28,17 +28,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    environment:
-      NODE_ENV: ${NODE_ENV}
-      DOMAIN: ${DOMAIN}
-      APP_PORT: ${APP_PORT}
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      PGHOST: postgres
-      PGPORT: 5432
-      PGUSER: ${POSTGRES_USER}
-      PGPASSWORD: ${POSTGRES_PASSWORD}
-      PGDATABASE: ${POSTGRES_DB}
-      PGSSLMODE: disable
+    env_file:
+      - .env
     ports:
       - "${PORT_BE_PROXY}:${PORT_BE_PROXY}"
       - "${PORT_INTERNAL_BE}:${PORT_INTERNAL_BE}"

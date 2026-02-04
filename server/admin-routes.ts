@@ -3603,7 +3603,7 @@ function registerAdminRoutes(app: Express) {
         }
 
 
-        const testUrl = `https://graph.facebook.com/v22.0/${businessManagerId}`;
+        const testUrl = `https://graph.facebook.com/v24.0/${businessManagerId}`;
         const response = await axios.get(testUrl, {
           params: {
             access_token: accessToken || `${appId}|${appSecret}`,

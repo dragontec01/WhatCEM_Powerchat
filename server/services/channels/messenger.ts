@@ -59,7 +59,7 @@ eventEmitter.setMaxListeners(50);
 import { eventEmitterMonitor } from '../../utils/event-emitter-monitor';
 eventEmitterMonitor.register('messenger-service', eventEmitter);
 
-const MESSENGER_API_VERSION = 'v22.0';
+const MESSENGER_API_VERSION = 'v24.0';
 const MESSENGER_GRAPH_URL = 'https://graph.facebook.com';
 
 /**

@@ -32,6 +32,9 @@ jobs:
         run: npm run build
         env:
           NODE_ENV: production
+          INSTANCE_NAME: whatcem
+          VITE_FACEBOOK_APP_ID: ${{ secrets.VITE_FACEBOOK_APP_ID }}
+          VITE_WHATSAPP_CONFIG_ID: ${{ secrets.VITE_WHATSAPP_CONFIG_ID }}
       
       - name: Create deployment archive
         run: |
