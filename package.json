@@ -84,6 +84,7 @@
     "@types/node-cron": "^3.0.11",
     "@types/qrcode": "^1.5.5",
     "@types/tar": "^6.1.13",
+    "axios": "^1.13.4",
     "baileys": "^7.0.0-rc.9",
     "bcrypt": "^6.0.0",
     "big-integer": "^1.6.52",

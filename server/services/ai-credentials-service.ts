@@ -35,20 +35,30 @@ interface CredentialSource {
  * Handles encryption, validation, and management of AI provider credentials
  */
 export class AiCredentialsService {
-  private encryptionKey: string;
+  private encryptionKey: Buffer;
 
   constructor() {
-    this.encryptionKey = process.env.ENCRYPTION_KEY || process.env.SESSION_SECRET || 'default-key';
+    const key = process.env.ENCRYPTION_KEY || process.env.SESSION_SECRET || 'default-key';
+    let finalKey: string;
+    if (key.length === 32) {
+      finalKey = key;
+    } else if (key.length > 32) {
+      finalKey = key.substring(0, 32);
+    } else {
+      finalKey = key.padEnd(32, '0');
+    }
+    this.encryptionKey = Buffer.from(finalKey, 'utf-8');
   }
 
   /**
    * Encrypt API key for secure storage
    */
   private encryptApiKey(apiKey: string): string {
-    const cipher = crypto.createCipher('aes-256-cbc', this.encryptionKey);
+    const iv = crypto.randomBytes(16);
+    const cipher = crypto.createCipheriv('aes-256-cbc', this.encryptionKey, iv);
     let encrypted = cipher.update(apiKey, 'utf8', 'hex');
     encrypted += cipher.final('hex');
-    return encrypted;
+    return iv.toString('hex') + ':' + encrypted;
   }
 
   /**
@@ -56,8 +66,10 @@ export class AiCredentialsService {
    */
   private decryptApiKey(encryptedKey: string): string {
     try {
-      const decipher = crypto.createDecipher('aes-256-cbc', this.encryptionKey);
-      let decrypted = decipher.update(encryptedKey, 'hex', 'utf8');
+      const [ivHex, encryptedData] = encryptedKey.split(':');
+      const iv = Buffer.from(ivHex, 'hex');
+      const decipher = crypto.createDecipheriv('aes-256-cbc', this.encryptionKey, iv);
+      let decrypted = decipher.update(encryptedData, 'hex', 'utf8');
       decrypted += decipher.final('utf8');
       return decrypted;
     } catch (error) {
