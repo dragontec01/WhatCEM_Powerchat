@@ -6,7 +6,7 @@ import crypto from 'crypto';
  */
 class SecureEnvironment {
   private static instance: SecureEnvironment;
-  private encryptionKey: string;
+  private encryptionKey: Buffer;
   private sensitiveKeys = [
     'DATABASE_URL',
     'SESSION_SECRET',
@@ -29,12 +29,17 @@ class SecureEnvironment {
     return SecureEnvironment.instance;
   }
 
-  private getOrCreateEncryptionKey(): string {
+  private getOrCreateEncryptionKey(): Buffer {
     const key = process.env.ENCRYPTION_KEY || crypto.randomBytes(32).toString('hex');
-    if (!process.env.ENCRYPTION_KEY) {
-      
+    let finalKey: string;
+    if (key.length === 32) {
+      finalKey = key;
+    } else if (key.length > 32) {
+      finalKey = key.substring(0, 32);
+    } else {
+      finalKey = key.padEnd(32, '0');
     }
-    return key;
+    return Buffer.from(finalKey, 'utf-8');
   }
 
   private validateEnvironment(): void {
@@ -67,10 +72,9 @@ class SecureEnvironment {
    */
   private encrypt(text: string): string {
     const algorithm = 'aes-256-gcm';
-    const key = Buffer.from(this.encryptionKey, 'hex');
     const iv = crypto.randomBytes(16);
     
-    const cipher = crypto.createCipher(algorithm, key);
+    const cipher = crypto.createCipheriv(algorithm, this.encryptionKey, iv);
     let encrypted = cipher.update(text, 'utf8', 'hex');
     encrypted += cipher.final('hex');
     
@@ -82,11 +86,10 @@ class SecureEnvironment {
    */
   private decrypt(encryptedText: string): string {
     const algorithm = 'aes-256-gcm';
-    const key = Buffer.from(this.encryptionKey, 'hex');
     const [ivHex, encrypted] = encryptedText.split(':');
     const iv = Buffer.from(ivHex, 'hex');
     
-    const decipher = crypto.createDecipher(algorithm, key);
+    const decipher = crypto.createDecipheriv(algorithm, this.encryptionKey, iv);
     let decrypted = decipher.update(encrypted, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
     
