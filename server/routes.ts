@@ -3506,6 +3506,20 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         data: connection
       }, user.companyId);
 
+      /**
+       * TODO: Add new template to notify users when new Deal is assigned via WhatsApp
+       * {
+       *  "name":"notify_contact_activity",
+       *  "description":"This is for users to track contact activity by redirecting them to the url to watch that activity",
+       *  "whatsappTemplateCategory":"utility",
+       *  "whatsappTemplateLanguage":"es",
+       *  "content":"Hola {{1}}, un nuevo contacto llegó a tu cuenta, puedes revisarlo en el siguiente enlace:\nhttps://app.whatcem.com/contacts",
+       *  "variables":["1"],
+       *  "whatsappChannelType":"official",
+       *  "connectionId":69
+       * }
+       */
+
       res.status(201).json(connection);
     } catch (error) {
       console.error('Error processing WhatsApp Business API signup:', error);
