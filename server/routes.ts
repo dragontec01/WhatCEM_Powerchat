@@ -103,6 +103,7 @@ import { inboxBackupService } from "./services/inbox-backup";
 import { inboxBackupSchedulerService } from "./services/inbox-backup-scheduler";
 
 import { smartWebSocketBroadcaster } from "./utils/smart-websocket-broadcaster";
+import { createWabaTemplate } from "./utils/whatsapp-templates-flow";
 
 
 const scryptAsync = promisify(scrypt);
@@ -3506,19 +3507,17 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         data: connection
       }, user.companyId);
 
-      /**
-       * TODO: Add new template to notify users when new Deal is assigned via WhatsApp
-       * {
-       *  "name":"notify_contact_activity",
-       *  "description":"This is for users to track contact activity by redirecting them to the url to watch that activity",
-       *  "whatsappTemplateCategory":"utility",
-       *  "whatsappTemplateLanguage":"es",
-       *  "content":"Hola {{1}}, un nuevo contacto llegó a tu cuenta, puedes revisarlo en el siguiente enlace:\nhttps://app.whatcem.com/contacts",
-       *  "variables":["1"],
-       *  "whatsappChannelType":"official",
-       *  "connectionId":69
-       * }
-       */
+      await createWabaTemplate({
+        name: "notify_contact_activity",
+        description: "This is for users to track contact activity by redirecting them to the url to watch that activity",
+        whatsappTemplateCategory: "utility",
+        whatsappTemplateLanguage: "es",
+        content: "Hola {{1}}, un nuevo contacto llegó a tu cuenta, puedes revisarlo en el siguiente enlace:\nhttps://app.whatcem.com/contacts",
+        variables: ["1"],
+        headerType: 'none',
+        connectionId: connection.id
+      }, user)
+
 
       res.status(201).json(connection);
     } catch (error) {
