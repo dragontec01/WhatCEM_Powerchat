@@ -1,6 +1,6 @@
 -- Add connectionId field to campaign_templates table
 ALTER TABLE campaign_templates 
-ADD COLUMN IF NOT EXISTS connection_id INTEGER REFERENCES channel_connections(id);
+ADD COLUMN IF NOT EXISTS connection_id INTEGER REFERENCES channel_connections(id) ON DELETE CASCADE;
 
 -- Add index for better query performance
 CREATE INDEX IF NOT EXISTS idx_campaign_templates_connection_id ON campaign_templates(connection_id);
