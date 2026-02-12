@@ -12,7 +12,7 @@ BEGIN
     
     CREATE TABLE follow_up_templates (
       id SERIAL PRIMARY KEY,
-      company_id INTEGER NOT NULL REFERENCES companies(id),
+      company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
       name TEXT NOT NULL,
       description TEXT,
       message_type TEXT NOT NULL DEFAULT 'text' CHECK (message_type IN ('text', 'image', 'video', 'audio', 'document')),
@@ -25,7 +25,7 @@ BEGIN
       category TEXT DEFAULT 'general',
       is_active BOOLEAN DEFAULT true,
       usage_count INTEGER DEFAULT 0,
-      created_by INTEGER REFERENCES users(id),
+      created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
       created_at TIMESTAMP NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
       

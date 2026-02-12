@@ -403,7 +403,7 @@ CREATE TABLE IF NOT EXISTS follow_up_schedules (
 
   -- Channel Information
   channel_type TEXT NOT NULL,
-  channel_connection_id INTEGER REFERENCES channel_connections(id),
+  channel_connection_id INTEGER REFERENCES channel_connections(id) ON DELETE SET NULL,
 
   -- Metadata
   variables JSONB DEFAULT '{}'::jsonb,
@@ -430,7 +430,7 @@ CREATE TABLE IF NOT EXISTS follow_up_templates (
   category TEXT DEFAULT 'general',
   is_active BOOLEAN DEFAULT true,
   usage_count INTEGER DEFAULT 0,
-  created_by INTEGER REFERENCES users(id),
+  created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
 
