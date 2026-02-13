@@ -186,6 +186,11 @@ export function WhatsAppEmbeddedSignup({ isOpen, onClose, onSuccess }: Props) {
         onClose();
       } else {
         const error = await response.json();
+        toast({
+          title: "Connection Error",
+          description: `Failed to connect your WhatsApp Business account by exchanging the authorization code.\n ${error.message || ''}`,
+          variant: "destructive"
+        });
         throw new Error(error.message || 'Failed to connect WhatsApp Business account');
       }
     } catch (error: any) {
