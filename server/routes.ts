@@ -3430,9 +3430,9 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       const phoneNumberId = phoneNumber.id;
 
 
-      if(phoneNumber.code_verification_status !== "VERIFIED") {
+      /* if(phoneNumber.code_verification_status !== "VERIFIED") {
         return res.status(400).json({ message: 'Phone number needs to be verified first' })
-      }
+      } */
 
       if(phoneNumber.status !== "CONNECTED") {
         // Code made with year and month numbers
