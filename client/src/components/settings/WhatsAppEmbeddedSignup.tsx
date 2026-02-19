@@ -86,11 +86,11 @@ export function WhatsAppEmbeddedSignup({ isOpen, onClose, onSuccess }: Props) {
               });
               console.log('Received wabaId and phoneNumberId via postMessage');
               try {
-                await exchangeCodeForWhatsAppConnection(businessCodeRef.current as string, data.data.waba_id);
                 toast({
                   title: "Connection Successful",
-                  description: "Your WhatsApp Business account has been connected successfully.",
+                  description: "Your WhatsApp Business account has sent the confirmation data. Finalizing connection...",
                 });
+                await exchangeCodeForWhatsAppConnection(businessCodeRef.current as string, data.data.waba_id);
               } catch (error) {
                 console.error('Error exchanging code for WhatsApp connection:', error);
                 toast({
