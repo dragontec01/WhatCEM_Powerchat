@@ -3408,7 +3408,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       }
 
       const phoneNumbersResponse = await fetch(
-        `https://graph.facebook.com/v24.0/${wabaId}/phone_numbers?access_token=${accessToken}&&fields=id,cc,country_dial_code,display_phone_number,verified_name,status,quality_rating,search_visibility,platform_type,code_verification_status`
+        `https://graph.facebook.com/v24.0/${wabaId}/phone_numbers?access_token=${accessToken}&fields=id,cc,country_dial_code,display_phone_number,verified_name,status,quality_rating,search_visibility,platform_type,code_verification_status`
       );
 
       if (!phoneNumbersResponse.ok) {
@@ -3426,22 +3426,35 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         return res.status(400).json({ message: 'No phone numbers found for this WhatsApp Business account' });
       }
 
+      // Suscribe to webhook events for this phone number
+      const webhookSubscriptionResponse = await fetch(`https://graph.facebook.com/v24.0/${wabaId}/subscribed_apps`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
+      })
+
+      if (!webhookSubscriptionResponse.ok) {
+        const errorData = await webhookSubscriptionResponse.json();
+        console.error('Failed to subscribe to webhook events:', errorData);
+        return res.status(400).json({
+          message: 'Failed to subscribe to webhook events',
+          error: errorData
+        });
+      }
+
       const phoneNumber = phoneNumbersData.data[0];
       const phoneNumberId = phoneNumber.id;
 
 
-      /* if(phoneNumber.code_verification_status !== "VERIFIED") {
-        return res.status(400).json({ message: 'Phone number needs to be verified first' })
-      } */
-
-      if(phoneNumber.status !== "CONNECTED") {
-        // Code made with year and month numbers
-          const pinCode = new Date().getFullYear().toString() + (new Date().getMonth() + 1).toString().padStart(2, '0');
-          const registerResponse = await fetch(`https://graph.facebook.com/v24.0/${wabaId}/register`, {
+      if(phoneNumber.code_verification_status !== "VERIFIED" && phoneNumber.code_verification_status !== "EXPIRED") {
+        const pinCode = new Date().getFullYear().toString() + (new Date().getMonth() + 1).toString().padStart(2, '0');
+          const registerResponse = await fetch(`https://graph.facebook.com/v24.0/${phoneNumberId}/register`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${accessToken}`
+              'Authorization': `Bearer ${process.env?.WHATSAPP_TOKEN_REGISTER || accessToken}`
             },
             body: JSON.stringify({
               messaging_product: 'whatsapp',
