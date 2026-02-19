@@ -3447,8 +3447,14 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       const phoneNumber = phoneNumbersData.data[0];
       const phoneNumberId = phoneNumber.id;
 
+      if(phoneNumber.code_verification_status !== "EXPIRED") {
+        return res.status(400).json({
+          message: 'The phone number verification has expired. Please verify the phone number again to connect it.',
+        });
+      }
 
-      if(phoneNumber.code_verification_status !== "VERIFIED" && phoneNumber.code_verification_status !== "EXPIRED") {
+
+      if(phoneNumber.code_verification_status !== "VERIFIED") {
         const pinCode = new Date().getFullYear().toString() + (new Date().getMonth() + 1).toString().padStart(2, '0');
           const registerResponse = await fetch(`https://graph.facebook.com/v24.0/${phoneNumberId}/register`, {
             method: 'POST',
