@@ -3455,7 +3455,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
 
 
       if(phoneNumber.code_verification_status !== "VERIFIED") {
-        const pinCode = new Date().getFullYear().toString() + (new Date().getMonth() + 1).toString().padStart(2, '0');
+        const pinCode = "123456";
           const registerResponse = await fetch(`https://graph.facebook.com/v24.0/${phoneNumberId}/register`, {
             method: 'POST',
             headers: {
