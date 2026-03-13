@@ -2,7 +2,7 @@ export default {
 
   compact: true,
   controlFlowFlattening: true,
-  controlFlowFlatteningThreshold: 1,
+  controlFlowFlatteningThreshold: 0.75, // Reduced from 1 for better Node 24 compatibility
   numbersToExpressions: true,
   simplify: true,
   stringArrayShuffle: true,
@@ -12,8 +12,8 @@ export default {
 
   deadCodeInjection: true,
   deadCodeInjectionThreshold: 0.4,
-  debugProtection: true,
-  debugProtectionInterval: 4000,
+  debugProtection: false, // Disabled - causes issues with Node 24+
+  debugProtectionInterval: 0,
   disableConsoleOutput: false, // Keep console output in production
   
 
@@ -39,7 +39,7 @@ export default {
   unicodeEscapeSequence: false, // Keep false for Node.js compatibility
   
 
-  selfDefending: true,
+  selfDefending: false, // Disabled - causes runtime crashes with Node 24+ V8 changes
   
 
 
