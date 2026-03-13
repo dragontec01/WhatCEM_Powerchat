@@ -2060,6 +2060,9 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
   const EMAIL_MEDIA_DIR = path.join(UPLOAD_DIR, 'email-attachments');
   fsExtra.ensureDirSync(EMAIL_MEDIA_DIR);
 
+  const TEMP_CHAT_MEDIA_DIR = path.join(UPLOAD_DIR, 'temp-chat-media');
+  fsExtra.ensureDirSync(TEMP_CHAT_MEDIA_DIR);
+
 
 
   const flowMediaStorage = multer.diskStorage({
@@ -3484,7 +3487,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       if (!user.companyId) {
         return res.status(400).json({ message: 'Company ID is required for multi-tenant security' });
       }
-
+      const defaultAssign = await storage.getDefaultAssigns(user.companyId);
       const connection = await storage.createChannelConnection({
         userId: user.id,
         companyId: user.companyId,
@@ -3492,6 +3495,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         accountId: wabaId,
         accountName: `WhatsApp Business - ${phoneNumber.verified_name || phoneNumber.display_phone_number}`,
         accessToken: accessToken,
+        assignId: defaultAssign ? defaultAssign.id : undefined,
         status: 'connected',
         connectionData: {
           phoneNumberId: phoneNumberId,
@@ -10330,7 +10334,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
     const simpleUpload = multer({
       storage: multer.diskStorage({
         destination: function (req, file, cb) {
-          cb(null, UPLOAD_DIR);
+          cb(null, TEMP_CHAT_MEDIA_DIR );
         },
         filename: function (req, file, cb) {
           const uniqueId = crypto.randomBytes(16).toString('hex');
@@ -10788,7 +10792,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
     const simpleUpload = multer({
       storage: multer.diskStorage({
         destination: function (req, file, cb) {
-          cb(null, UPLOAD_DIR);
+          cb(null, TEMP_CHAT_MEDIA_DIR);
         },
         filename: function (req, file, cb) {
           const uniqueId = crypto.randomBytes(16).toString('hex');
