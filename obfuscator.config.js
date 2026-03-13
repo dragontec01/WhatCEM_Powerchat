@@ -1,19 +1,19 @@
 export default {
 
   compact: true,
-  controlFlowFlattening: false, // Disabled - causes Node 24 V8 issues
-  controlFlowFlatteningThreshold: 0.75,
+  controlFlowFlattening: true,
+  controlFlowFlatteningThreshold: 1,
   numbersToExpressions: true,
   simplify: true,
   stringArrayShuffle: true,
   splitStrings: true,
-  stringArrayThreshold: 0.75,
+  stringArrayThreshold: 1,
   
 
-  deadCodeInjection: false, // Disabled - causes Node 24 issues
+  deadCodeInjection: true,
   deadCodeInjectionThreshold: 0.4,
-  debugProtection: false, // Disabled - causes Node 24 issues
-  debugProtectionInterval: 0,
+  debugProtection: true,
+  debugProtectionInterval: 4000,
   disableConsoleOutput: false, // Keep console output in production
   
 
@@ -23,14 +23,14 @@ export default {
   
 
   stringArray: true,
-  stringArrayCallsTransform: false, // Disabled - can cause issues with Node 24
+  stringArrayCallsTransform: true,
   stringArrayCallsTransformThreshold: 0.5,
-  stringArrayEncoding: ['base64'], // Changed from rc4 - rc4 can cause issues
+  stringArrayEncoding: ['rc4'],
   stringArrayIndexShift: true,
   stringArrayRotate: true,
   stringArrayShuffle: true,
   stringArrayWrappersCount: 1,
-  stringArrayWrappersChainedCalls: false, // Disabled for stability
+  stringArrayWrappersChainedCalls: true,
   stringArrayWrappersParametersMaxCount: 2,
   stringArrayWrappersType: 'variable',
   stringArrayThreshold: 0.75,
@@ -39,7 +39,7 @@ export default {
   unicodeEscapeSequence: false, // Keep false for Node.js compatibility
   
 
-  selfDefending: false, // Disabled - primary cause of Node 24 crashes
+  selfDefending: true,
   
 
 

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import Stripe from 'stripe';
-import paypal from "@paypal/paypal-server-sdk";
+import * as paypal from "@paypal/paypal-server-sdk";
 import { storage } from '../storage';
 import { db } from '../db';
 import {
