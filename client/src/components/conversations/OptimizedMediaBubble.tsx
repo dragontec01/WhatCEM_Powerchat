@@ -120,7 +120,6 @@ export default function OptimizedMediaBubble({
                   alt={t('message_bubble.image_message', 'Image message')}
                   className="max-w-full rounded-md object-contain"
                   style={{ maxHeight: '240px' }}
-                  crossOrigin="anonymous"
                   loading="eager"
                   onError={(e) => {
                     e.currentTarget.style.display = 'none';
@@ -180,7 +179,6 @@ export default function OptimizedMediaBubble({
                 controls
                 className="max-w-full rounded-md"
                 style={{ maxHeight: '240px' }}
-                crossOrigin="anonymous"
                 preload="metadata"
               >
                 <source src={mediaUrl} type="video/mp4" />
@@ -254,7 +252,7 @@ export default function OptimizedMediaBubble({
 
           return (
             <div className="message-media">
-              <audio controls className="max-w-full" crossOrigin="anonymous" preload="metadata">
+              <audio controls className="max-w-full" preload="metadata">
                 <source src={mediaUrl} type={audioMimeType} />
                 {/* Fallback sources for better compatibility */}
                 <source src={mediaUrl} type="audio/mpeg" />
@@ -360,7 +358,6 @@ export default function OptimizedMediaBubble({
                 src={mediaUrl}
                 alt={t('message_bubble.sticker', 'Sticker')}
                 className="max-w-[120px] max-h-[120px]"
-                crossOrigin="anonymous"
                 loading="eager"
               />
             </div>

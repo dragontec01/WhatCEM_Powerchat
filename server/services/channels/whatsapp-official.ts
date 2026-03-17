@@ -1467,6 +1467,7 @@ export function getActiveBusinessConnections(): number[] {
  * @returns True if connection is active, false otherwise
  */
 export function isBusinessConnectionActive(connectionId: number): boolean {
+  console.log({connectionId, active: activeConnections.get(connectionId), allActive: Array.from(activeConnections.entries())});
   return activeConnections.has(connectionId) && activeConnections.get(connectionId) === true;
 }
 
