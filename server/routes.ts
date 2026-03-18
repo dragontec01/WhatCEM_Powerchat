@@ -77,7 +77,7 @@ import TikTokService from "./services/channels/tiktok";
 import emailService from "./services/channels/email";
 import webchatService from "./services/channels/webchat";
 import whatsAppService, { downloadAndSaveMedia, getConnection as getWhatsAppConnection } from "./services/channels/whatsapp";
-import whatsAppOfficialService from "./services/channels/whatsapp-official";
+import whatsAppOfficialService, {downloadAndSaveMedia as downloadAndSaveWaOfficial} from "./services/channels/whatsapp-official";
 import whatsAppTwilioService from "./services/channels/whatsapp-twilio";
 import whatsApp360DialogService from "./services/channels/whatsapp-360dialog";
 import whatsApp360DialogPartnerService from "./services/channels/whatsapp-360dialog-partner";
@@ -2350,7 +2350,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       }
 
       const waMessage = metadata.waMessage ||
-        metadata.message ||
+        metadata.mediaId ||
         (metadata.messageData && metadata.messageData.message);
 
       if (!waMessage) {
@@ -2378,22 +2378,21 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         return res.status(400).json({ error: 'Conversation not found or has no channel ID' });
       }
 
-      if (conversation.channelType !== 'whatsapp' && conversation.channelType !== 'whatsapp_unofficial') {
+      if (conversation.channelType !== 'whatsapp' && conversation.channelType !== 'whatsapp_unofficial' && conversation.channelType !== 'whatsapp_official') {
         return res.status(400).json({ error: 'Media download only supported for WhatsApp channels' });
       }
 
-      const sock = getWhatsAppConnection(conversation.channelId);
-
-      if (!sock) {
-        return res.status(400).json({ error: 'WhatsApp connection not active' });
+      const channelData = await storage.getChannelConnection(conversation.channelId);
+      if (!channelData) {
+        return res.status(400).json({ error: 'Channel data not found' });
       }
 
       const messageObj = metadata.waMessage ||
-        metadata.message ||
+        metadata.mediaId ||
         (metadata.messageData && metadata.messageData.message);
-
-      const mediaUrl = await downloadAndSaveMedia(messageObj, sock, conversation.channelId);
-
+      console.log('Attempting to download media for message ID:', messageId, 'with metadata:', metadata);
+      const mediaUrl = await downloadAndSaveWaOfficial(messageObj, channelData?.accessToken || (channelData?.connectionData as any)?.accessToken);
+      console.log('Media download result for message ID:', messageId, 'Media URL:', mediaUrl);
       if (!mediaUrl) {
 
         return res.status(202).json({
