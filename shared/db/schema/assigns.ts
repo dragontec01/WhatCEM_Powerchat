@@ -68,6 +68,7 @@ export const channelConnections = pgTable("channel_connections", {
 export const insertChannelConnectionSchema = createInsertSchema(channelConnections).pick({
   userId: true,
   companyId: true,
+  assignId: true,
   channelType: true,
   accountId: true,
   accountName: true,

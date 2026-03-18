@@ -1,7 +1,7 @@
 import { Express, Request, Response, NextFunction } from "express";
 import { storage } from "./storage";
 import Stripe from "stripe";
-import paypal from "@paypal/paypal-server-sdk";
+import * as paypal from "@paypal/paypal-server-sdk";
 import { affiliateService } from "./services/affiliate-service";
 
 

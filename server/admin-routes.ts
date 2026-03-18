@@ -7,7 +7,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import Stripe from "stripe";
-import paypal from "@paypal/paypal-server-sdk";
+import * as paypal from "@paypal/paypal-server-sdk";
 import { pool, db } from "./db";
 import { ensureSuperAdmin } from "./middleware";
 import nodemailer from "nodemailer";

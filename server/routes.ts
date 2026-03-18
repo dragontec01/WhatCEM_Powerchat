@@ -77,7 +77,7 @@ import TikTokService from "./services/channels/tiktok";
 import emailService from "./services/channels/email";
 import webchatService from "./services/channels/webchat";
 import whatsAppService, { downloadAndSaveMedia, getConnection as getWhatsAppConnection } from "./services/channels/whatsapp";
-import whatsAppOfficialService from "./services/channels/whatsapp-official";
+import whatsAppOfficialService, {downloadAndSaveMedia as downloadAndSaveWaOfficial} from "./services/channels/whatsapp-official";
 import whatsAppTwilioService from "./services/channels/whatsapp-twilio";
 import whatsApp360DialogService from "./services/channels/whatsapp-360dialog";
 import whatsApp360DialogPartnerService from "./services/channels/whatsapp-360dialog-partner";
@@ -2060,6 +2060,9 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
   const EMAIL_MEDIA_DIR = path.join(UPLOAD_DIR, 'email-attachments');
   fsExtra.ensureDirSync(EMAIL_MEDIA_DIR);
 
+  const TEMP_CHAT_MEDIA_DIR = path.join(UPLOAD_DIR, 'temp-chat-media');
+  fsExtra.ensureDirSync(TEMP_CHAT_MEDIA_DIR);
+
 
 
   const flowMediaStorage = multer.diskStorage({
@@ -2347,7 +2350,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       }
 
       const waMessage = metadata.waMessage ||
-        metadata.message ||
+        metadata.mediaId ||
         (metadata.messageData && metadata.messageData.message);
 
       if (!waMessage) {
@@ -2375,22 +2378,21 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         return res.status(400).json({ error: 'Conversation not found or has no channel ID' });
       }
 
-      if (conversation.channelType !== 'whatsapp' && conversation.channelType !== 'whatsapp_unofficial') {
+      if (conversation.channelType !== 'whatsapp' && conversation.channelType !== 'whatsapp_unofficial' && conversation.channelType !== 'whatsapp_official') {
         return res.status(400).json({ error: 'Media download only supported for WhatsApp channels' });
       }
 
-      const sock = getWhatsAppConnection(conversation.channelId);
-
-      if (!sock) {
-        return res.status(400).json({ error: 'WhatsApp connection not active' });
+      const channelData = await storage.getChannelConnection(conversation.channelId);
+      if (!channelData) {
+        return res.status(400).json({ error: 'Channel data not found' });
       }
 
       const messageObj = metadata.waMessage ||
-        metadata.message ||
+        metadata.mediaId ||
         (metadata.messageData && metadata.messageData.message);
-
-      const mediaUrl = await downloadAndSaveMedia(messageObj, sock, conversation.channelId);
-
+      console.log('Attempting to download media for message ID:', messageId, 'with metadata:', metadata);
+      const mediaUrl = await downloadAndSaveWaOfficial(messageObj, channelData?.accessToken || (channelData?.connectionData as any)?.accessToken);
+      console.log('Media download result for message ID:', messageId, 'Media URL:', mediaUrl);
       if (!mediaUrl) {
 
         return res.status(202).json({
@@ -3484,7 +3486,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       if (!user.companyId) {
         return res.status(400).json({ message: 'Company ID is required for multi-tenant security' });
       }
-
+      const defaultAssign = await storage.getDefaultAssigns(user.companyId);
       const connection = await storage.createChannelConnection({
         userId: user.id,
         companyId: user.companyId,
@@ -3492,6 +3494,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         accountId: wabaId,
         accountName: `WhatsApp Business - ${phoneNumber.verified_name || phoneNumber.display_phone_number}`,
         accessToken: accessToken,
+        assignId: defaultAssign ? defaultAssign.id : undefined,
         status: 'connected',
         connectionData: {
           phoneNumberId: phoneNumberId,
@@ -10330,7 +10333,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
     const simpleUpload = multer({
       storage: multer.diskStorage({
         destination: function (req, file, cb) {
-          cb(null, UPLOAD_DIR);
+          cb(null, TEMP_CHAT_MEDIA_DIR );
         },
         filename: function (req, file, cb) {
           const uniqueId = crypto.randomBytes(16).toString('hex');
@@ -10437,19 +10440,18 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
 
       let isConnectionActive = false;
       if (conversation.channelType === 'whatsapp_official') {
-        isConnectionActive = whatsAppOfficialService.isActive?.(conversation.channelId) ?? false;
-
+        isConnectionActive = whatsAppOfficialService.isActive(conversation.channelId) ?? false;
         if (!isConnectionActive && channelConnection.connectionData) {
           try {
             const connectionData = channelConnection.connectionData as any;
-            if (connectionData.accessToken && connectionData.phoneNumberId && connectionData.wabaId) {
+            if ((channelConnection.accessToken || connectionData.accessToken) && connectionData.phoneNumberId && connectionData.wabaId) {
               await whatsAppOfficialService.initializeConnection(conversation.channelId, user.companyId, {
-                accessToken: connectionData.accessToken,
+                accessToken: channelConnection.accessToken || connectionData.accessToken,
                 phoneNumberId: connectionData.phoneNumberId,
                 wabaId: connectionData.wabaId || connectionData.businessAccountId,
                 webhookVerifyToken: process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || 'default_verify_token'
               });
-              isConnectionActive = whatsAppOfficialService.isActive?.(conversation.channelId) ?? false;
+              isConnectionActive = whatsAppOfficialService.isActive(conversation.channelId) ?? false;
             }
           } catch (initError) {
             console.error('Failed to initialize WhatsApp Official connection:', initError);
@@ -10517,13 +10519,13 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
 
           const host = req.get('host') || 'localhost:9000';
           const protocol = host.includes('localhost') ? 'http' : req.protocol;
-          let publicUrl = `${protocol}://${host}/uploads/${path.basename(req.file.path)}`;
-          const publicPath = path.join(process.cwd(), 'uploads', path.basename(req.file.path));
-
+          let publicUrl = `${protocol}://${host}/uploads/temp-chat-media/${path.basename(req.file.path)}`;
+          const publicPath = path.join(TEMP_CHAT_MEDIA_DIR, path.basename(req.file.path));
+          console.log('Public path for media upload:', publicPath);
           if (path.resolve(req.file.path) !== path.resolve(publicPath)) {
             await fsExtra.copy(req.file.path, publicPath);
           }
-
+          console.log({publicPath, publicUrl});
           let finalMimeType = req.file.mimetype;
           let finalFilename = req.file.originalname;
 
@@ -10545,12 +10547,12 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
                 );
 
                 const convertedBasename = path.basename(conversionResult.outputPath);
-                const convertedPublicPath = path.join(process.cwd(), 'uploads', convertedBasename);
+                const convertedPublicPath = path.join(TEMP_CHAT_MEDIA_DIR, convertedBasename);
                 await fsExtra.copy(conversionResult.outputPath, convertedPublicPath);
 
                 convertedFilePath = convertedPublicPath;
 
-                publicUrl = `${protocol}://${host}/uploads/${convertedBasename}`;
+                publicUrl = `${protocol}://${host}/uploads/temp-chat-media/${convertedBasename}`;
                 finalMimeType = conversionResult.mimeType;
                 finalFilename = convertedBasename;
 
@@ -10576,8 +10578,8 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         } else if (conversation.channelType === 'whatsapp_twilio') {
           const host = req.get('host') || 'localhost:9000';
           const protocol = host.includes('localhost') ? 'http' : req.protocol;
-          const publicUrl = `${protocol}://${host}/uploads/${path.basename(req.file.path)}`;
-          const publicPath = path.join(process.cwd(), 'uploads', path.basename(req.file.path));
+          const publicUrl = `${protocol}://${host}/uploads/temp-chat-media/${path.basename(req.file.path)}`;
+          const publicPath = path.join(TEMP_CHAT_MEDIA_DIR, path.basename(req.file.path));
 
           if (path.resolve(req.file.path) !== path.resolve(publicPath)) {
             await fsExtra.copy(req.file.path, publicPath);
@@ -10595,8 +10597,8 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         } else if (conversation.channelType === 'whatsapp_360dialog') {
           const host = req.get('host') || 'localhost:9000';
           const protocol = host.includes('localhost') ? 'http' : req.protocol;
-          const publicUrl = `${protocol}://${host}/uploads/${path.basename(req.file.path)}`;
-          const publicPath = path.join(process.cwd(), 'uploads', path.basename(req.file.path));
+          const publicUrl = `${protocol}://${host}/uploads/temp-chat-media/${path.basename(req.file.path)}`;
+          const publicPath = path.join(TEMP_CHAT_MEDIA_DIR, path.basename(req.file.path));
 
           if (path.resolve(req.file.path) !== path.resolve(publicPath)) {
             await fsExtra.copy(req.file.path, publicPath);
@@ -10644,8 +10646,8 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
 
           const host = req.get('host') || 'localhost:9000';
           const protocol = host.includes('localhost') ? 'http' : req.protocol;
-          const publicUrl = `${protocol}://${host}/uploads/${path.basename(req.file.path)}`;
-          const publicPath = path.join(process.cwd(), 'uploads', path.basename(req.file.path));
+          const publicUrl = `${protocol}://${host}/uploads/temp-chat-media/${path.basename(req.file.path)}`;
+          const publicPath = path.join(TEMP_CHAT_MEDIA_DIR, path.basename(req.file.path));
 
 
           if (path.resolve(req.file.path) !== path.resolve(publicPath)) {
@@ -10755,7 +10757,13 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         });
       }
 
-      await fsExtra.unlink(req.file.path);
+      // Keep the file on disk — the message's mediaUrl points to the local
+      // /uploads/temp-chat-media/ URL and the file must persist for the
+      // frontend to display it. Only Baileys uses an external CDN URL, but
+      // keeping the file for Baileys as well is harmless.
+      // Files are cleaned up by the Baileys service or a periodic job.
+
+      /* await fsExtra.unlink(req.file.path);
 
       if (convertedFilePath) {
         try {
@@ -10763,7 +10771,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         } catch (cleanupError) {
           console.error('Error cleaning up converted audio file:', cleanupError);
         }
-      }
+      } */
 
       return res.status(201).json(message);
     } catch (error: any) {
@@ -10788,7 +10796,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
     const simpleUpload = multer({
       storage: multer.diskStorage({
         destination: function (req, file, cb) {
-          cb(null, UPLOAD_DIR);
+          cb(null, TEMP_CHAT_MEDIA_DIR);
         },
         filename: function (req, file, cb) {
           const uniqueId = crypto.randomBytes(16).toString('hex');
