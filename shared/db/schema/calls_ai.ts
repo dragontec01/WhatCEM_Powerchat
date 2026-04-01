@@ -49,6 +49,8 @@ export const callLogs = pgTable("call_logs", {
   id: serial("id").primaryKey(),
   callConfigurationId: integer("call_configuration_id").notNull().references(() => callConfiguration.id),
   companyId: integer("company_id").references(() => companies.id),
+  systemPrompt: text("system_prompt"),
+  greetingPrompt: text("greeting_prompt"),
   phoneNumber: varchar("phone_number", { length: 50 }),
   callSid: varchar("call_sid", { length: 100 }).unique(),
   status: text("status", {
@@ -65,6 +67,8 @@ export const insertCallLogSchema = createInsertSchema(callLogs).pick({
   callConfigurationId: true,
   companyId: true,
   phoneNumber: true,
+  systemPrompt: true,
+  greetingPrompt: true,
   callSid: true,
   status: true,
   durationSeconds: true,
@@ -84,6 +88,8 @@ export const scheduledCalls = pgTable("scheduled_calls", {
   status: text("status", {
     enum: ['pending', 'called', 'failed', 'cancelled']
   }).default('pending'),
+  systemPrompt: text("system_prompt"),
+  greetingPrompt: text("greeting_prompt"),
   callSid: varchar("call_sid", { length: 100 }),
   errorMessage: text("error_message"),
   createdAt: timestamp("created_at").notNull().defaultNow()
@@ -96,7 +102,9 @@ export const insertScheduledCallSchema = createInsertSchema(scheduledCalls).pick
   contactName: true,
   customInstructions: true,
   scheduledFor: true,
-  status: true
+  status: true,
+  systemPrompt: true,
+  greetingPrompt: true,
 });
 
 export type CallConfiguration = typeof callConfiguration.$inferSelect;

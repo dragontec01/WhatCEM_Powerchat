@@ -33,6 +33,8 @@ CREATE TABLE IF NOT EXISTS call_logs (
     call_sid                VARCHAR(100) UNIQUE,
     status                  TEXT DEFAULT 'initiated'
                                 CHECK (status IN ('initiated', 'ringing', 'in-progress', 'completed', 'failed', 'busy', 'no-answer')),
+    system_prompt           TEXT,
+    greeting_prompt         TEXT,
     duration_seconds        INTEGER DEFAULT 0,
     transcript              TEXT DEFAULT '',
     summary                 TEXT DEFAULT '',
@@ -57,7 +59,9 @@ CREATE TABLE IF NOT EXISTS scheduled_calls (
     contact_name            VARCHAR(100),
     custom_instructions     TEXT,
     scheduled_for           TIMESTAMP NOT NULL,
-    status                  TEXT DEFAULT 'pending'
+    status                  TEXT DEFAULT 'pending',
+    system_prompt           TEXT,
+    greeting_prompt         TEXT,
                                 CHECK (status IN ('pending', 'called', 'failed', 'cancelled')),
     call_sid                VARCHAR(100),
     error_message           TEXT,
