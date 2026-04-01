@@ -18,6 +18,7 @@ start.js
 /.idea/inspectionProfiles/Project_Default.xml
 /.idea/vcs.xml
 /.idea/workspace.xml
+/.claude
 /data
 # Hide all env files
 .env*

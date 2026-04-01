@@ -9,6 +9,7 @@ import BotIcon from '@/components/ui/bot-icon';
 import { OpenAIIcon } from '@/components/ui/openai-icon';
 import { useFlowContext } from '../../pages/flow-builder';
 import { useTranslation } from '@/hooks/use-translation';
+import { useAuth } from '@/hooks/use-auth';
 
 import { Button } from "@/components/ui/button";
 import {
@@ -521,12 +522,14 @@ interface AIAssistantNodeProps {
 
 export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProps) {
   const { t } = useTranslation();
+  const { company } = useAuth();
+  const showAutoCredential = !['demo', 'enterprise'].includes(company?.plan || '');
   const { providers: AI_PROVIDERS, isLoading: isLoadingModels, error: modelsError } = useAIProviders();
   const [isEditing, setIsEditing] = useState(false);
   const [provider, setProvider] = useState(data.provider || 'openai');
   const [model, setModel] = useState(data.model || 'gpt-4o-mini');
   const [apiKey, setApiKey] = useState(data.apiKey || '');
-  const [credentialSource, setCredentialSource] = useState(data.credentialSource || 'auto');
+  const [credentialSource, setCredentialSource] = useState(data.credentialSource || (showAutoCredential ? 'auto' : 'manual'));
   const [timezone, setTimezone] = useState(data.timezone || getBrowserTimezone());
   const [language, setLanguage] = useState(data.language || 'en');
   const [prompt, setPrompt] = useState(data.prompt || t('flow_builder.ai_default_system_prompt', 'You are a helpful assistant. Answer user questions concisely and accurately. Only perform specific actions when the user explicitly requests them.'));
@@ -1844,12 +1847,14 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="auto">
-                          <div className="flex items-center gap-2">
-                            <Shield className="w-3 h-3" />
-                            <span>{t('flow_builder.ai_credential_auto', 'Auto (Company → System → Manual)')}</span>
-                          </div>
-                        </SelectItem>
+                        {showAutoCredential && (
+                          <SelectItem value="auto">
+                            <div className="flex items-center gap-2">
+                              <Shield className="w-3 h-3" />
+                              <span>{t('flow_builder.ai_credential_auto', 'Auto (Company → System → Manual)')}</span>
+                            </div>
+                          </SelectItem>
+                        )}
                         <SelectItem value="company">
                           <div className="flex items-center gap-2">
                             <Building className="w-3 h-3" />

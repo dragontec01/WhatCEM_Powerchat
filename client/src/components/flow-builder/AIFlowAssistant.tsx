@@ -97,14 +97,15 @@ export function AIFlowAssistant({
   const [isTyping, setIsTyping] = useState(false);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [selectedSuggestion, setSelectedSuggestion] = useState<FlowSuggestion | null>(null);
-  const [credentialSource, setCredentialSource] = useState<'auto' | 'company' | 'system'>('auto');
+  const { company } = useAuth();
+  const showAutoCredential = !['demo', 'enterprise'].includes(company?.plan || '');
+  const [credentialSource, setCredentialSource] = useState<'auto' | 'company' | 'system'>(showAutoCredential ? 'auto' : 'company');
   const [showSettings, setShowSettings] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
-  const { user } = useAuth();
 
 
   useEffect(() => {
@@ -572,14 +573,14 @@ Choose a WhatsApp bot template to get started instantly, or describe your own cu
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="auto">
+                          {showAutoCredential && (<SelectItem value="auto">
                             <div className="flex items-center gap-2">
                               <Shield className={`${isMobile ? 'w-4 h-4' : 'w-3 h-3'}`} />
                               <span className={isMobile ? 'text-sm' : 'text-xs'}>
                                 Auto (Company → System)
                               </span>
                             </div>
-                          </SelectItem>
+                          </SelectItem>)}
                           <SelectItem value="company">
                             <div className="flex items-center gap-2">
                               <Building className={`${isMobile ? 'w-4 h-4' : 'w-3 h-3'}`} />

@@ -36,21 +36,28 @@ if (!fs.existsSync(serverFile)) {
   process.exit(1);
 }
 
-try {
-  const sourceCode = fs.readFileSync(serverFile, 'utf8');
-  const obfuscatorConfigModule = await import('../obfuscator.config.js');
-  const obfuscatorConfig = obfuscatorConfigModule.default;
-  
+// TEMPORARY: Skip obfuscation to test if base code works on Node 24
+const SKIP_OBFUSCATION = process.env.SKIP_OBFUSCATION === 'true';
 
-  const obfuscatedCode = JavaScriptObfuscator.obfuscate(sourceCode, obfuscatorConfig);
-  
+if (SKIP_OBFUSCATION) {
+  console.log('⚠️ SKIPPING OBFUSCATION - Debug mode');
+} else {
+  try {
+    const sourceCode = fs.readFileSync(serverFile, 'utf8');
+    const obfuscatorConfigModule = await import('../obfuscator.config.js');
+    const obfuscatorConfig = obfuscatorConfigModule.default;
+    
 
-  fs.writeFileSync(serverFile, obfuscatedCode.getObfuscatedCode());
-  
+    const obfuscatedCode = JavaScriptObfuscator.obfuscate(sourceCode, obfuscatorConfig);
+    
 
-} catch (error) {
-  console.error('❌ Obfuscation failed:', error.message);
-  process.exit(1);
+    fs.writeFileSync(serverFile, obfuscatedCode.getObfuscatedCode());
+    
+
+  } catch (error) {
+    console.error('❌ Obfuscation failed:', error.message);
+    process.exit(1);
+  }
 }
 
 
@@ -76,20 +83,7 @@ const runtimeProtection = `
 (function() {
   'use strict';
 
-
-
-
-  setInterval(function() {
-    if (typeof window !== 'undefined') return;
-    const start = Date.now();
-    debugger;
-    if (Date.now() - start > 100) {
-      console.warn('⚠️ Debugging attempt detected');
-
-    }
-  }, 9000);
-
-
+  // Environment check only - removed debugger statement for Node 24 compatibility
   if (process.env.NODE_ENV !== 'production') {
     console.error('Invalid environment');
     process.exit(1);

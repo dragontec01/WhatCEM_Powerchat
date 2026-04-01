@@ -112,7 +112,7 @@ export async function getConnectionStatus(connectionId: number, companyId: numbe
 export async function downloadAndSaveMedia(
   mediaId: string,
   accessToken: string,
-  mediaType: string
+  mediaType?: string
 ): Promise<string | null> {
   try {
     const mediaKey = crypto.createHash('md5').update(mediaId).digest('hex');
@@ -121,7 +121,7 @@ export async function downloadAndSaveMedia(
       const cachedUrl = mediaCache.get(mediaKey);
       if (cachedUrl) {
         
-
+        console.log(`Verifying existence of cached media file at ${cachedUrl}`);
         const filePath = path.join(process.cwd(), 'public', cachedUrl.substring(1));
         if (await fsExtra.pathExists(filePath)) {
           return cachedUrl;
@@ -134,7 +134,20 @@ export async function downloadAndSaveMedia(
 
     let extension = '.bin';
 
-    switch (mediaType) {
+    // Step 1: Get the download URL from the Graph API
+    const metadataResponse = await axios({
+      url: `${WHATSAPP_GRAPH_URL}/${WHATSAPP_API_VERSION}/${mediaId}`,
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`
+      }
+    });
+
+    console.log({responseData: metadataResponse.data});
+
+    const mediaTypeValue = mediaType || metadataResponse.data?.mime_type?.split('/')?.[0] || 'document';
+
+    switch (mediaTypeValue) {
       case 'image':
         extension = '.jpg';
         break;
@@ -149,12 +162,12 @@ export async function downloadAndSaveMedia(
         break;
     }
 
-    const mediaTypeDir = path.join(MEDIA_DIR, mediaType);
+    const mediaTypeDir = path.join(MEDIA_DIR, mediaTypeValue);
     await fsExtra.ensureDir(mediaTypeDir);
 
     const filename = `${mediaKey}${extension}`;
     const filepath = path.join(mediaTypeDir, filename);
-    const mediaUrl = `/media/${mediaType}/${filename}`;
+    const mediaUrl = `/media/${mediaTypeValue}/${filename}`;
 
     
 
@@ -164,8 +177,15 @@ export async function downloadAndSaveMedia(
       return mediaUrl;
     }
 
+    const downloadUrl = metadataResponse.data?.url;
+    if (!downloadUrl) {
+      console.error('No download URL returned for media ID:', mediaId);
+      return null;
+    }
+
+    // Step 2: Download the actual binary from the CDN URL
     const mediaResponse = await axios({
-      url: `${WHATSAPP_GRAPH_URL}/${WHATSAPP_API_VERSION}/${mediaId}`,
+      url: downloadUrl,
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${accessToken}`
@@ -1467,6 +1487,7 @@ export function getActiveBusinessConnections(): number[] {
  * @returns True if connection is active, false otherwise
  */
 export function isBusinessConnectionActive(connectionId: number): boolean {
+  console.log({connectionId, active: activeConnections.get(connectionId), allActive: Array.from(activeConnections.entries())});
   return activeConnections.has(connectionId) && activeConnections.get(connectionId) === true;
 }
 

@@ -1,16 +1,11 @@
 import * as fs from 'fs/promises';
 import { createRequire } from 'module';
+import { PDFParse } from 'pdf-parse';
 
 const require = createRequire(import.meta.url);
 
-let pdfParse: any;
 let mammoth: any;
 let pdfjsDist: any;
-
-try {
-  pdfParse = require('pdf-parse');
-} catch (error) {
-}
 
 try {
   mammoth = require('mammoth');
@@ -71,14 +66,16 @@ export class TextDocumentProcessor {
    * Extract text from PDF files using pdf-parse
    */
   private static async extractTextFromPDF(filePath: string): Promise<string> {
-    if (!pdfParse) {
+    if (!PDFParse) {
       throw new Error('PDF processing not available. Please install pdf-parse: npm install pdf-parse');
     }
 
     try {
       const buffer = await fs.readFile(filePath);
-      const data = await pdfParse(buffer);
+      const parser = new PDFParse({ data: buffer });
+      const data = await parser.getText();
 
+      await parser.destroy();
       return data.text
         .replace(/\r\n/g, '\n')
         .replace(/\r/g, '\n')
@@ -268,7 +265,7 @@ export class TextDocumentProcessor {
     doc: boolean;
   } {
     return {
-      pdf: !!pdfParse,
+      pdf: !!PDFParse,
       pdfAdvanced: !!pdfjsDist,
       docx: !!mammoth,
       doc: !!mammoth
@@ -285,7 +282,7 @@ export class TextDocumentProcessor {
       'application/octet-stream'
     ];
 
-    if (pdfParse || pdfjsDist) {
+    if (PDFParse || pdfjsDist) {
       supported.push('application/pdf');
     }
 

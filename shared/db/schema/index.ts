@@ -17,3 +17,4 @@ export * from "./translations";
 export * from "./calendars";
 export * from "./affiliates";
 export * from "./schema_scheduled_messages";
+export * from "./calls_ai";

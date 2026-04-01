@@ -340,14 +340,6 @@ export default function MessageBubble({ message, contact, channelType, onReply, 
       if (data.mediaUrl) {
         setLocalMediaUrl(data.mediaUrl);
 
-        const { updateMessageInCache } = require('@/hooks/useMessageCache');
-        if (updateMessageInCache) {
-          updateMessageInCache(message.id, { 
-            mediaUrl: data.mediaUrl,
-            mediaUrlFetchedAt: Date.now()
-          }).catch(console.error);
-        }
-
         if (!data.simulated) {
           await triggerFileDownload(data.mediaUrl, message);
 

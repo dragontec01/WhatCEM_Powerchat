@@ -28,8 +28,20 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    env_file:
-      - .env
+    environment:
+      NODE_ENV: ${NODE_ENV}
+      DOMAIN: ${DOMAIN}
+      APP_PORT: ${APP_PORT}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      PGHOST: postgres
+      PGPORT: 5432
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB}
+      PGSSLMODE: disable
     ports:
       - "${PORT_BE_PROXY}:${PORT_BE_PROXY}"
       - "${PORT_INTERNAL_BE}:${PORT_INTERNAL_BE}"
@@ -37,6 +49,7 @@ services:
     volumes:
       - .:/app
       - /app/node_modules
+      - ./docker-entrypoint.dev.sh:/usr/local/bin/docker-entrypoint.sh:ro
     command: npm run dev
     networks:
       - powerchat_dev_network
