@@ -504,6 +504,20 @@ export default function Sidebar() {
           </div>
         </PermissionGate>
 
+        <div className="mt-6 pt-4 border-t border-gray-700">
+          <h3 className={`text-xs uppercase tracking-wide text-gray-500 mb-2 px-2 ${isCollapsed ? 'hidden' : 'block'}`}>IA</h3>
+          <div className="flex flex-col space-y-1">
+            <Link
+              href="/voice-assistant"
+              className={`flex items-center px-2 py-2 rounded-lg ${location === '/voice-assistant' ? 'text-white' : 'text-gray-400 hover:text-white'}`}
+              style={location === '/voice-assistant' ? companyStyle.activeItem : {}}
+            >
+              <i className="ri-phone-line text-xl"></i>
+              <span className={`ml-3 ${isCollapsed ? 'hidden' : 'block'}`}>Asistente de Llamadas</span>
+            </Link>
+          </div>
+        </div>
+
         <div className="mt-auto pt-4">
           <TrialStatus isCollapsed={isCollapsed} />
 
