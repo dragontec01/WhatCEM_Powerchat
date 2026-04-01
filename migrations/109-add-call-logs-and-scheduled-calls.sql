@@ -28,7 +28,7 @@ CREATE INDEX IF NOT EXISTS idx_call_configuration_company_id ON call_configurati
 CREATE TABLE IF NOT EXISTS call_logs (
     id                      SERIAL PRIMARY KEY,
     call_configuration_id   INTEGER NOT NULL REFERENCES call_configuration(id),
-    campaign_id             INTEGER REFERENCES campaigns(id),
+    company_id             INTEGER REFERENCES companies(id),
     phone_number            VARCHAR(50),
     call_sid                VARCHAR(100) UNIQUE,
     status                  TEXT DEFAULT 'initiated'
@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS call_logs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_call_logs_config_id ON call_logs(call_configuration_id);
-CREATE INDEX IF NOT EXISTS idx_call_logs_campaign_id ON call_logs(campaign_id);
+CREATE INDEX IF NOT EXISTS idx_call_logs_company_id ON call_logs(company_id);
 CREATE INDEX IF NOT EXISTS idx_call_logs_call_sid ON call_logs(call_sid);
 CREATE INDEX IF NOT EXISTS idx_call_logs_status ON call_logs(status);
 CREATE INDEX IF NOT EXISTS idx_call_logs_created_at ON call_logs(created_at);
@@ -52,7 +52,7 @@ CREATE INDEX IF NOT EXISTS idx_call_logs_created_at ON call_logs(created_at);
 CREATE TABLE IF NOT EXISTS scheduled_calls (
     id                      SERIAL PRIMARY KEY,
     call_configuration_id   INTEGER NOT NULL REFERENCES call_configuration(id),
-    campaign_id             INTEGER REFERENCES campaigns(id),
+    company_id             INTEGER REFERENCES companies(id),
     phone_number            VARCHAR(50) NOT NULL,
     contact_name            VARCHAR(100),
     custom_instructions     TEXT,
@@ -65,7 +65,7 @@ CREATE TABLE IF NOT EXISTS scheduled_calls (
 );
 
 CREATE INDEX IF NOT EXISTS idx_scheduled_calls_config_id ON scheduled_calls(call_configuration_id);
-CREATE INDEX IF NOT EXISTS idx_scheduled_calls_campaign_id ON scheduled_calls(campaign_id);
+CREATE INDEX IF NOT EXISTS idx_scheduled_calls_company_id ON scheduled_calls(company_id);
 CREATE INDEX IF NOT EXISTS idx_scheduled_calls_status ON scheduled_calls(status);
 CREATE INDEX IF NOT EXISTS idx_scheduled_calls_scheduled_for ON scheduled_calls(scheduled_for);
 
