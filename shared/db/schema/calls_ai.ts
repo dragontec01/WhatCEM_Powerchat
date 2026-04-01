@@ -48,7 +48,7 @@ export const insertCallConfigurationSchema = createInsertSchema(callConfiguratio
 export const callLogs = pgTable("call_logs", {
   id: serial("id").primaryKey(),
   callConfigurationId: integer("call_configuration_id").notNull().references(() => callConfiguration.id),
-  campaignId: integer("campaign_id").references(() => campaigns.id),
+  companyId: integer("company_id").references(() => companies.id),
   phoneNumber: varchar("phone_number", { length: 50 }),
   callSid: varchar("call_sid", { length: 100 }).unique(),
   status: text("status", {
@@ -63,7 +63,7 @@ export const callLogs = pgTable("call_logs", {
 
 export const insertCallLogSchema = createInsertSchema(callLogs).pick({
   callConfigurationId: true,
-  campaignId: true,
+  companyId: true,
   phoneNumber: true,
   callSid: true,
   status: true,
@@ -76,7 +76,7 @@ export const insertCallLogSchema = createInsertSchema(callLogs).pick({
 export const scheduledCalls = pgTable("scheduled_calls", {
   id: serial("id").primaryKey(),
   callConfigurationId: integer("call_configuration_id").notNull().references(() => callConfiguration.id),
-  campaignId: integer("campaign_id").references(() => campaigns.id),
+  companyId: integer("company_id").references(() => companies.id),
   phoneNumber: varchar("phone_number", { length: 50 }).notNull(),
   contactName: varchar("contact_name", { length: 100 }),
   customInstructions: text("custom_instructions"),
@@ -91,7 +91,7 @@ export const scheduledCalls = pgTable("scheduled_calls", {
 
 export const insertScheduledCallSchema = createInsertSchema(scheduledCalls).pick({
   callConfigurationId: true,
-  campaignId: true,
+  companyId: true,
   phoneNumber: true,
   contactName: true,
   customInstructions: true,
