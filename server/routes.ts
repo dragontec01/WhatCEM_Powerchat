@@ -55,6 +55,7 @@ import campaignRoutes from "./routes/campaigns";
 import templateMediaRoutes from "./routes/template-media";
 import autoUpdateRoutes from "./routes/auto-update";
 import followUpRoutes from "./routes/follow-ups";
+import aiCallsRoutes from "./routes/ai-calls";
 import subscriptionDataFixRoutes from "./routes/subscription-data-fix";
 import emailTemplateRoutes from "./routes/email-templates";
 import flowVariablesRoutes from "./routes/flow-variables";
@@ -541,6 +542,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
 
   app.use('/api/follow-ups', ensureAuthenticated, followUpRoutes);
+
+  app.use('/api/ai-calls', ensureAuthenticated, aiCallsRoutes);
 
   app.use('/api/email-templates', ensureAuthenticated, emailTemplateRoutes);
 
