@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { db } from '../db.js';
-import { callLogs } from '../../shared/db/schema/calls_ai.js';
+import { callLogs, insertCallConfigurationSchema } from '../../shared/db/schema/calls_ai.js';
 import { eq } from 'drizzle-orm';
 import AICallsService from '../services/ai-calls.js';
 
@@ -64,7 +64,6 @@ router.get('/call-logs', async (req, res) => {
       .select({
         id: callLogs.id,
         callConfigurationId: callLogs.callConfigurationId,
-        campaignId: callLogs.campaignId,
         phoneNumber: callLogs.phoneNumber,
         callSid: callLogs.callSid,
         status: callLogs.status,
@@ -85,5 +84,45 @@ router.get('/call-logs', async (req, res) => {
     return res.status(500).json({ success: false, error: getErrorMessage(error) });
   }
 });
+
+// ============================================================
+// POST /api/ai-calls/configurations
+// Forwards a new call configuration to the external AI calls service
+// ============================================================
+router.post('/configurations', async (req, res) => {
+  const companyId = req.user?.companyId || req.body.companyId; // Allow companyId from body for flexibility
+  if (!companyId) {
+    return res.status(403).json({ success: false, error: 'Company ID not found in session' });
+  }
+
+  const bodySchema = insertCallConfigurationSchema;
+
+  const parsed = bodySchema.safeParse({...req.body, voiceModel: req.body.voiceModel || 'shimmer', companyId });
+  if (!parsed.success) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid request body',
+      details: parsed.error.message[0],
+    });
+  }
+
+  try {
+    const result = await aiCallsService.createConfiguration({
+      system_prompt: parsed.data.systemPrompt,
+      greeting_prompt: parsed.data.greetingPrompt,
+      openai_api_key: parsed.data.openaiApiKey,
+      twl_account_sid: parsed.data.twlAccountSid,
+      twl_auth_token: parsed.data.twlAuthToken,
+      twl_phone_number: parsed.data.twlPhoneNumber,
+      voice_model: parsed.data.voiceModel, 
+      company_id: companyId, 
+    });
+    return res.status(201).json({ success: true, data: result });
+  } catch (error) {
+    console.error('Error creating configuration');
+    return res.status(500).json({ success: false, error: getErrorMessage(error) });
+  }
+});
+
 
 export default router;
