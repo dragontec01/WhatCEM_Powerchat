@@ -33,6 +33,16 @@ class AICallsService {
             throw error;
         }
     }
+
+    async deleteScheduledCall(callSid: string) {
+        try {
+            const response = await this.aiCallsService.delete(`/api/v1/scheduled/${callSid}`);
+            return response.data;
+        } catch (error) {
+            console.error("Error deleting scheduled call:", (error as AxiosError)?.response?.data || error);
+            throw error;
+        }
+    }
 }
 
 export default AICallsService;

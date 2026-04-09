@@ -1,9 +1,11 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { db } from '../db.js';
-import { callLogs, insertCallConfigurationSchema } from '../../shared/db/schema/calls_ai.js';
-import { eq } from 'drizzle-orm';
+import { callLogs, scheduledCalls, insertCallConfigurationSchema } from '../../shared/db/schema/calls_ai.js';
+import { eq, and } from 'drizzle-orm';
 import AICallsService from '../services/ai-calls.js';
+import { requireAnyPermission } from 'server/middleware.js';
+import logger from '@shared/logger.js';
 
 const router = Router();
 const aiCallsService = new AICallsService();
@@ -15,7 +17,7 @@ const getErrorMessage = (error: unknown): string =>
 // POST /api/ai-calls/scheduled-calls
 // Forwards a new scheduled call to the external AI calls service
 // ============================================================
-router.post('/scheduled-calls', async (req, res) => {
+router.post('/scheduled-calls', requireAnyPermission(['create_scheduled_calls']), async (req, res) => {
   const companyId = req.user?.companyId;
   if (!companyId) {
     return res.status(403).json({ success: false, error: 'Company ID not found in session' });
@@ -23,7 +25,6 @@ router.post('/scheduled-calls', async (req, res) => {
 
   const bodySchema = z.object({
     callConfigurationId: z.number().int().positive(),
-    campaignId: z.number().int().positive().optional().nullable(),
     phoneNumber: z.string().min(1).max(50),
     contactName: z.string().max(100).optional().nullable(),
     customInstructions: z.string().optional().nullable(),
@@ -36,7 +37,7 @@ router.post('/scheduled-calls', async (req, res) => {
     return res.status(400).json({
       success: false,
       error: 'Invalid request body',
-      details: parsed.error.flatten().fieldErrors,
+      details: parsed.error.message[0],
     });
   }
 
@@ -44,7 +45,7 @@ router.post('/scheduled-calls', async (req, res) => {
     const result = await aiCallsService.scheduleCall({ ...parsed.data, companyId });
     return res.status(201).json({ success: true, data: result });
   } catch (error) {
-    console.error('Error scheduling call:', error);
+    logger.error('call-ai', 'Error scheduling call:', error);
     return res.status(500).json({ success: false, error: getErrorMessage(error) });
   }
 });
@@ -53,7 +54,7 @@ router.post('/scheduled-calls', async (req, res) => {
 // GET /api/ai-calls/call-logs
 // Returns all call logs for the authenticated user's company
 // ============================================================
-router.get('/call-logs', async (req, res) => {
+router.get('/call-logs', requireAnyPermission(['view_call_logs']), async (req, res) => {
   const companyId = req.user?.companyId;
   if (!companyId) {
     return res.status(403).json({ success: false, error: 'Company ID not found in session' });
@@ -80,7 +81,72 @@ router.get('/call-logs', async (req, res) => {
 
     return res.json({ success: true, data: logs });
   } catch (error) {
-    console.error('Error fetching call logs:', error);
+    logger.error('call-ai', 'Error fetching call logs:', error);
+    return res.status(500).json({ success: false, error: getErrorMessage(error) });
+  }
+});
+
+// ============================================================
+// GET /api/ai-calls/scheduled-calls/:configId
+// Returns scheduled calls by call_configuration_id, validated by company
+// ============================================================
+router.get('/scheduled-calls/:configId', requireAnyPermission(['view_scheduled_calls']), async (req, res) => {
+  const companyId = req.user?.companyId;
+  if (!companyId) {
+    return res.status(403).json({ success: false, error: 'Company ID not found in session' });
+  }
+
+  const configId = parseInt(String(req.params.configId), 10);
+  if (isNaN(configId)) {
+    return res.status(400).json({ success: false, error: 'Invalid configuration ID' });
+  }
+
+  try {
+    const calls = await db
+      .select()
+      .from(scheduledCalls)
+      .where(and(
+        eq(scheduledCalls.callConfigurationId, configId),
+        eq(scheduledCalls.companyId, companyId)
+      ));
+
+    return res.json({ success: true, data: calls });
+  } catch (error) {
+    logger.error('call-ai', 'Error fetching scheduled calls:', error);
+    return res.status(500).json({ success: false, error: getErrorMessage(error) });
+  }
+});
+
+// ============================================================
+// DELETE /api/ai-calls/scheduled-calls/:callSid
+// Deletes a scheduled call via AICallsService after validating company ownership
+// ============================================================
+router.delete('/scheduled-calls/:callSid', requireAnyPermission(['create_scheduled_calls']), async (req, res) => {
+  const companyId = req.user?.companyId;
+  if (!companyId) {
+    return res.status(403).json({ success: false, error: 'Company ID not found in session' });
+  }
+
+  const { callSid } = req.params;
+
+  try {
+    const [scheduled] = await db
+      .select({ id: scheduledCalls.id })
+      .from(scheduledCalls)
+      .where(and(
+        eq(scheduledCalls.callSid, callSid as string),
+        eq(scheduledCalls.companyId, companyId)
+      ))
+      .limit(1);
+
+    if (!scheduled) {
+      return res.status(404).json({ success: false, error: 'Scheduled call not found for this company' });
+    }
+
+    const result = await aiCallsService.deleteScheduledCall(callSid as string);
+    return res.json({ success: true, data: result });
+  } catch (error) {
+    logger.error('call-ai', 'Error deleting scheduled call:', error);
     return res.status(500).json({ success: false, error: getErrorMessage(error) });
   }
 });
@@ -89,7 +155,7 @@ router.get('/call-logs', async (req, res) => {
 // POST /api/ai-calls/configurations
 // Forwards a new call configuration to the external AI calls service
 // ============================================================
-router.post('/configurations', async (req, res) => {
+router.post('/configurations', requireAnyPermission(['create_call_configurations']), async (req, res) => {
   const companyId = req.user?.companyId || req.body.companyId; // Allow companyId from body for flexibility
   if (!companyId) {
     return res.status(403).json({ success: false, error: 'Company ID not found in session' });
@@ -119,7 +185,7 @@ router.post('/configurations', async (req, res) => {
     });
     return res.status(201).json({ success: true, data: result });
   } catch (error) {
-    console.error('Error creating configuration');
+    logger.error('call-ai', 'Error creating call configuration:', error);
     return res.status(500).json({ success: false, error: getErrorMessage(error) });
   }
 });
