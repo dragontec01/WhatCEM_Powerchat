@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { db } from '../db.js';
-import { callLogs, scheduledCalls, insertCallConfigurationSchema } from '../../shared/db/schema/calls_ai.js';
+import { callLogs, scheduledCalls, insertCallConfigurationSchema, callConfiguration } from '../../shared/db/schema/calls_ai.js';
 import { eq, and } from 'drizzle-orm';
 import AICallsService from '../services/ai-calls.js';
 import { requireAnyPermission } from 'server/middleware.js';
 import logger from '@shared/logger.js';
+import { DEFAULT_AXIOS_CONFIG_OVERRIDES } from 'node_modules/@paypal/paypal-server-sdk/dist/esm/types/clientAdapter.js';
 
 const router = Router();
 const aiCallsService = new AICallsService();
@@ -24,12 +25,12 @@ router.post('/scheduled-calls', requireAnyPermission(['create_scheduled_calls'])
   }
 
   const bodySchema = z.object({
-    callConfigurationId: z.number().int().positive(),
     phoneNumber: z.string().min(1).max(50),
     contactName: z.string().max(100).optional().nullable(),
     customInstructions: z.string().optional().nullable(),
-    scheduledFor: z.string().datetime(),
-    status: z.enum(['pending', 'called', 'failed', 'cancelled']).optional(),
+    systemPrompt: z.string().optional().nullable(),
+    greetingPrompt: z.string().optional().nullable(),
+    scheduledFor: z.string().datetime()
   });
 
   const parsed = bodySchema.safeParse(req.body);
@@ -41,11 +42,76 @@ router.post('/scheduled-calls', requireAnyPermission(['create_scheduled_calls'])
     });
   }
 
+  const configuration = await db
+    .select()
+    .from(callConfiguration)
+    .where(eq(callConfiguration.companyId, companyId))
+    .limit(1)
+    .then(results => results[0]);
+
   try {
-    const result = await aiCallsService.scheduleCall({ ...parsed.data, companyId });
+    const result = await aiCallsService.scheduleCall({
+      config_id: configuration?.id,
+      to: parsed.data.phoneNumber,
+      contact_name: parsed.data.contactName,
+      custom_instructions: parsed.data.customInstructions,
+      system_prompt: parsed.data.systemPrompt || configuration?.systemPrompt,
+      greeting_prompt: parsed.data.greetingPrompt || configuration?.greetingPrompt,
+      scheduled_for: parsed.data.scheduledFor,
+    });
     return res.status(201).json({ success: true, data: result });
   } catch (error) {
     logger.error('call-ai', 'Error scheduling call:', error);
+    return res.status(500).json({ success: false, error: getErrorMessage(error) });
+  }
+});
+
+// ============================================================
+// POST /api/ai-calls/call
+// Forwards a new call to the external AI calls service
+// ============================================================
+router.post('/call', requireAnyPermission(['create_scheduled_calls']), async (req, res) => {
+  const companyId = req.user?.companyId;
+  if (!companyId) {
+    return res.status(403).json({ success: false, error: 'Company ID not found in session' });
+  }
+
+  const bodySchema = z.object({
+    phoneNumber: z.string().min(1).max(50),
+    contactName: z.string().max(100).optional().nullable(),
+    customInstructions: z.string().optional().nullable(),
+    systemPrompt: z.string().optional().nullable(),
+    greetingPrompt: z.string().optional().nullable()
+  });
+
+  const parsed = bodySchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid request body',
+      details: parsed.error.message[0],
+    });
+  }
+
+  const configuration = await db
+    .select()
+    .from(callConfiguration)
+    .where(eq(callConfiguration.companyId, companyId))
+    .limit(1)
+    .then(results => results[0]);
+
+  try {
+    const result = await aiCallsService.makeCall({ 
+      config_id: configuration?.id,
+      to: parsed.data.phoneNumber,
+      contact_name: parsed.data.contactName, 
+      custom_instructions: parsed.data.customInstructions,
+      system_prompt: parsed.data.systemPrompt || configuration?.systemPrompt,
+      greeting_prompt: parsed.data.greetingPrompt || configuration?.greetingPrompt,
+    });
+    return res.status(201).json({ success: true, data: result });
+  } catch (error) {
+    logger.error('call-ai', 'Error making call:', error);
     return res.status(500).json({ success: false, error: getErrorMessage(error) });
   }
 });
