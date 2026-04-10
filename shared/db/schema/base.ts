@@ -67,7 +67,15 @@ export const PERMISSIONS = {
 
   CREATE_BACKUPS: 'create_backups',
   RESTORE_BACKUPS: 'restore_backups',
-  MANAGE_BACKUPS: 'manage_backups'
+  MANAGE_BACKUPS: 'manage_backups',
+  
+  CREATE_CALL_CONFIGURATIONS: 'create_call_configurations',
+
+  VIEW_CALL_LOGS: 'view_call_logs',
+
+  CREATE_SCHEDULED_CALLS: 'create_scheduled_calls',
+  VIEW_SCHEDULED_CALLS: 'view_scheduled_calls',
+  MANAGE_SCHEDULED_CALLS: 'manage_scheduled_calls'
 } as const;
 
 export const DEFAULT_ROLE_PERMISSIONS = {

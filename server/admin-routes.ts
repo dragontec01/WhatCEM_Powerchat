@@ -12,7 +12,7 @@ import { pool, db } from "./db";
 import { ensureSuperAdmin } from "./middleware";
 import nodemailer from "nodemailer";
 import { createCipheriv, createDecipheriv, randomBytes as cryptoRandomBytes } from "crypto";
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 import { registerAffiliateRoutes } from "./routes/admin/affiliate-routes";
 import adminAiCredentialsRoutes from "./routes/admin-ai-credentials";
 import { parseDialog360Error, createErrorResponse } from "./services/channels/360dialog-errors";
@@ -21,6 +21,7 @@ import { logger } from "./utils/logger";
 import { databaseBackupLogs } from "../shared/db/schema";
 import { desc, sql } from "drizzle-orm";
 import { invalidateSubdomainCache } from "./middleware/subdomain";
+import AICallsService from "./services/ai-calls";
 
 interface SMTPConfig {
   enabled: boolean;
@@ -4272,6 +4273,36 @@ function registerAdminRoutes(app: Express) {
     } catch (error) {
       console.error("Error clearing company data:", error);
       res.status(500).json({ error: "Failed to clear company data" });
+    }
+  });
+
+  // ============================================================
+  // AI Call Configuration
+  // ============================================================
+  app.post("/api/admin/ai-call-configurations", ensureSuperAdmin, async (req: Request, res: Response) => {
+    const bodySchema = z.object({
+      companyId: z.number().int().positive().optional().nullable(),
+      systemPrompt: z.string().optional().nullable(),
+      greetingPrompt: z.string().optional().nullable(),
+      openaiApiKey: z.string().max(255).optional().nullable(),
+      twlAccountSid: z.string().max(255).optional().nullable(),
+      twlAuthToken: z.string().max(255).optional().nullable(),
+      twlPhoneNumber: z.string().max(50).optional().nullable(),
+      voiceModel: z.string().max(50).optional().default("gpt-3.5-turbo"),
+    });
+
+    const parsed = bodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Invalid request body", details: parsed.error.flatten() });
+    }
+
+    try {
+      const aiCallsService = new AICallsService()
+      const result = await aiCallsService.createConfiguration(parsed.data);
+      return res.status(201).json(result);
+    } catch (error) {
+      logger.error("ai-calls", "Error creating AI call configuration", error);
+      return res.status((error as AxiosError).response?.status || 500).json({ error: "Failed to create AI call configuration" });
     }
   });
 }
