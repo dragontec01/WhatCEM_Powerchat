@@ -34,6 +34,7 @@ import { EventEmitter } from 'events';
 import * as path from 'path';
 import { isWhatsAppGroupChatId } from '../utils/whatsapp-group-filter';
 import { logger } from '../utils/logger';
+import { replaceUserVariables } from 'server/utils/whatsapp-templates-flow';
 
 dayjs.extend(utc);
 dayjs.extend(isBetween)
@@ -1018,16 +1019,6 @@ class FlowExecutor extends EventEmitter {
             if (await this.handleUserInputForSession(session, message, conversation, contact, channelConnection)) {
               messageHandled = true;
               break; // Only one session should handle user input
-            }
-          }
-        }
-
-
-        if (!messageHandled) {
-          for (const session of activeSessions) {
-            if (await this.handleActiveSessionMessage(session, message, conversation, contact, channelConnection)) {
-              messageHandled = true;
-              break; // Only one session should handle the message
             }
           }
         }
@@ -9124,7 +9115,7 @@ ${eventResult.eventLink ? `\nView event: ${eventResult.eventLink}` : ''}`;
       }
       
       logger.info('Creation Flow Executor', `Prevented duplicate deal creation for contact ${contact.id}`);
-      if(user.whatsappNumber) {
+      if(user.whatsappNumber && channelConnection.channelType === 'whatsapp_official') {
         logger.info('Creation Flow Executor', `Sending WhatsApp Business message to user ${user.id} about existing active deal ${existingActiveDeal.id}`);
         await whatsAppOfficialService.sendTemplateMessage(
           channelConnection.id,
@@ -9140,6 +9131,19 @@ ${eventResult.eventLink ? `\nView event: ${eventResult.eventLink}` : ''}`;
               text: user.fullName || user.whatsappNumber || 'Usuario'
             }]
           }],
+        );
+      } else if( user.whatsappNumber && channelConnection.channelType === 'whatsapp_unofficial') {
+        logger.info('Creation Flow Executor', `Sending WhatsApp message to user ${user.id} about existing active deal ${existingActiveDeal.id}`);
+        // Get default unofficial template
+        const defaultTemplate = await storage.getQuickRepliesTemplates(channelConnection?.companyId as number, 'notify_contact_activity_personal');
+        const templateText = defaultTemplate ? replaceUserVariables(defaultTemplate[0].content as string, user) : "";
+        await whatsAppService.sendMessage(
+          channelConnection.id,
+          channelConnection.userId,
+          user.whatsappNumber,
+          templateText || `Hola ${user.fullName || user.whatsappNumber || 'Usuario'}. Tienes un nuevo contacto`,
+          false,
+          conversation.id
         );
       }
       
@@ -9206,7 +9210,7 @@ ${eventResult.eventLink ? `\nView event: ${eventResult.eventLink}` : ''}`;
       });
 
 
-      if(user.whatsappNumber) {
+      if(user.whatsappNumber && channelConnection.channelType === 'whatsapp_official') {
         logger.info('Creation Flow Executor', `Sending WhatsApp Business message to user ${user.id} about existing active deal ${newDeal.id}`);
         await whatsAppOfficialService.sendTemplateMessage(
           channelConnection.id,
@@ -9222,6 +9226,19 @@ ${eventResult.eventLink ? `\nView event: ${eventResult.eventLink}` : ''}`;
               text: user.fullName || user.whatsappNumber || 'Usuario'
             }]
           }],
+        );
+      } else if( user.whatsappNumber && channelConnection.channelType === 'whatsapp_unofficial') {
+        logger.info('Creation Flow Executor', `Sending WhatsApp message to user ${user.id} about existing active deal ${newDeal.id}`);
+        // Get default unofficial template
+        const defaultTemplate = await storage.getQuickRepliesTemplates(channelConnection?.companyId as number, 'notify_contact_activity_personal');
+        const templateText = defaultTemplate ? replaceUserVariables(defaultTemplate[0].content as string, user) : "";
+        await whatsAppService.sendMessage(
+          channelConnection.id,
+          channelConnection.userId,
+          user.whatsappNumber,
+          templateText || `Hola ${user.fullName || user.whatsappNumber || 'Usuario'}. Tienes un nuevo contacto`,
+          false,
+          conversation.id
         );
       }
 

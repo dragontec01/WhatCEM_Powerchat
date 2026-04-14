@@ -108,12 +108,17 @@ export default function ConversationList() {
   }
 
 
-
+  const channelInfo = conversations.reduce((acc, conversation) => {
+    if( conversation.channelId === activeChannelId) {
+      acc = conversation.channelConnection;
+    }
+    return acc;
+  }, {});
   const filteredConversations = conversations
     .filter(conversation => {
 
       if (activeChannelId !== null) {
-        return conversation.channelId === activeChannelId;
+        return conversation.channelId === activeChannelId || conversation.channelConnection?.accountId === channelInfo?.accountId;
       }
       return true;
     })

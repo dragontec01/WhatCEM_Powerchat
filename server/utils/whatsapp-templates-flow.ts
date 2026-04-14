@@ -1,4 +1,4 @@
-import { CampaignTemplate, campaignTemplates } from "@shared/db/schema";
+import { CampaignTemplate, campaignTemplates, User } from "@shared/db/schema";
 import { db } from "../db";
 import { storage } from "../storage";
 import { eq, and, desc } from 'drizzle-orm';
@@ -555,3 +555,26 @@ export const createWabaTemplate = async (bodyTemplate: {
         .returning();
     return newTemplate[0];
 }
+
+export const replaceUserVariables = (template: string, context: User): string => {
+  if (!template) return '';
+
+  try {
+    let result = template;
+
+
+    if (context) {
+      result = result.replace(/\{\{contact\.name\}\}/g, context.fullName || '');
+      result = result.replace(/\{\{contact\.phone\}\}/g, context.whatsappNumber || '');
+      result = result.replace(/\{\{contact\.email\}\}/g, context.email || '');
+      result = result.replace(/\{\{contact\.identifier\}\}/g, context.id.toString() || '');
+      result = result.replace(/\{\{contact\.company\}\}/g, context.companyId?.toString() || '');
+      result = result.replace(/\{\{contact\.id\}\}/g, context.id?.toString() || '');
+    }
+
+    return result;
+  } catch (error) {
+    console.error('Error replacing variables in quick reply template:', error);
+    return template; // Return original template if replacement fails
+  }
+};

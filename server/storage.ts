@@ -84,6 +84,8 @@ import {
   InsertAssignUser,
   assignUsers,
   userIndexSchedule,
+  quickReplyTemplates,
+  QuickReplyTemplate,
 } from "@shared/db/schema";
 
 import session from "express-session";
@@ -11390,6 +11392,23 @@ async updateRolePermissions(role: 'admin' | 'agent', permissions: Record<string,
       return assignedUsers || [];
     } catch (error) {
       logger.error('storage', 'Error getting assigns with info');
+      throw error;
+    }
+  }
+
+  async getQuickRepliesTemplates(companyId: number, templateName?: string): Promise<QuickReplyTemplate[]> {
+    try {
+      let whereConditions = [eq(quickReplyTemplates.companyId, companyId)];
+      if( templateName) {
+        whereConditions.push(eq(quickReplyTemplates.name, templateName));
+      }
+
+      const templates = await db.select()
+        .from(quickReplyTemplates)
+        .where(...whereConditions);
+      return templates || [];
+    } catch (error) {
+      logger.error('storage', 'Error getting quick reply templates:', error);
       throw error;
     }
   }

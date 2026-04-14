@@ -17,10 +17,11 @@ import {
   insertFlowSchema,
   insertNoteSchema,
   invitationStatusTypes,
-  insertCompanyPageSchema
+  insertCompanyPageSchema,
+  quickReplyTemplates
 } from "@shared/db/schema";
 import crypto, { randomBytes, scrypt, timingSafeEqual } from "crypto";
-import { eq, and } from "drizzle-orm";
+import { eq, and, not } from "drizzle-orm";
 import { EventEmitter } from "events";
 import type { Express, Request, Response, NextFunction } from "express";
 import express from "express";
@@ -4965,6 +4966,39 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
 
       if (connection.channelType === 'whatsapp_unofficial') {
         try {
+          const user = req.user;
+          const defaultTemplateExists = await db.select().from(quickReplyTemplates)
+                .where(
+                  and(
+                    eq(quickReplyTemplates.companyId, user.companyId),
+                    eq(quickReplyTemplates.name, 'notify_contact_activity_personal')
+                  )
+                ).limit(1);
+
+          if( !defaultTemplateExists.length ) {
+
+            // Create Quick Reply Message Template
+            const maxSortOrder = await db.select({ max: quickReplyTemplates.sortOrder })
+                  .from(quickReplyTemplates)
+                  .where(
+                    eq(quickReplyTemplates.companyId, user.companyId)
+                  )
+                  .limit(1);
+            
+                const nextSortOrder = (maxSortOrder[0]?.max || 0) + 1;
+            
+                await db.insert(quickReplyTemplates).values({
+                  companyId: user.companyId,
+                  createdById: user.id,
+                  name: 'notify_contact_activity_personal',
+                  content: `Hola {{user.name}}, un nuevo contacto llegó a tu cuenta, puedes revisarlo en el siguiente enlace:\nhttps://app.whatcem.com/contacts`,
+                  category: 'general',
+                  variables: [],
+                  sortOrder: nextSortOrder,
+                  isActive: true
+                }).returning();
+          }
+
           whatsAppService.connect(connection.id, req.user.id)
             .catch(err => console.error('Error connecting to WhatsApp:', err));
 
