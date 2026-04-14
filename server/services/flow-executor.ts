@@ -9132,7 +9132,7 @@ ${eventResult.eventLink ? `\nView event: ${eventResult.eventLink}` : ''}`;
             }]
           }],
         );
-      } else if( user.whatsappNumber && channelConnection.channelType === 'whatsapp_unofficial') {
+      } else if( user.whatsappNumber && (channelConnection.channelType === 'whatsapp_unofficial' || channelConnection.channelType === 'whatsapp')) {
         logger.info('Creation Flow Executor', `Sending WhatsApp message to user ${user.id} about existing active deal ${existingActiveDeal.id}`);
         // Get default unofficial template
         const defaultTemplate = await storage.getQuickRepliesTemplates(channelConnection?.companyId as number, 'notify_contact_activity_personal');
@@ -9227,7 +9227,7 @@ ${eventResult.eventLink ? `\nView event: ${eventResult.eventLink}` : ''}`;
             }]
           }],
         );
-      } else if( user.whatsappNumber && channelConnection.channelType === 'whatsapp_unofficial') {
+      } else if( user.whatsappNumber && (channelConnection.channelType === 'whatsapp_unofficial' || channelConnection.channelType === 'whatsapp')) {
         logger.info('Creation Flow Executor', `Sending WhatsApp message to user ${user.id} about existing active deal ${newDeal.id}`);
         // Get default unofficial template
         const defaultTemplate = await storage.getQuickRepliesTemplates(channelConnection?.companyId as number, 'notify_contact_activity_personal');
