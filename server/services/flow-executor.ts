@@ -9235,10 +9235,15 @@ ${eventResult.eventLink ? `\nView event: ${eventResult.eventLink}` : ''}`;
         await whatsAppService.sendMessage(
           channelConnection.id,
           channelConnection.userId,
-          user.whatsappNumber,
+          user.whatsappNumber.startsWith('52') // Mexico numbers need +521 prefix
+            ? `521${user.whatsappNumber.slice(2)}`
+            : user.whatsappNumber.startsWith('54') // Argentina numbers need +549 prefix
+              ? `549${user.whatsappNumber.slice(2)}`
+              : user.whatsappNumber,
           templateText || `Hola ${user.fullName || user.whatsappNumber || 'Usuario'}. Tienes un nuevo contacto`,
           false,
-          conversation.id
+          conversation.id,
+          'flow'
         );
       }
 
