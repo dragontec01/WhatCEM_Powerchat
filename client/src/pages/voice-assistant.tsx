@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import Header from '@/components/layout/Header';
 import Sidebar from '@/components/layout/Sidebar';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,35 +11,42 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, Phone, PhoneCall, Clock, RefreshCw, X, ChevronRight } from 'lucide-react';
+import { Loader2, Phone, PhoneCall, Clock, RefreshCw, X, ChevronRight, AlertTriangle } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 
-const VOICE_BOT_URL = import.meta.env.VITE_VOICE_BOT_URL || 'http://localhost:5050';
 const AVAILABLE_VOICES = ['alloy', 'ash', 'ballad', 'coral', 'echo', 'sage', 'shimmer', 'verse'];
 
 interface CallLog {
   id: number;
-  phone_number: string;
-  call_sid: string;
+  phoneNumber: string;
+  callSid: string;
   status: string;
-  duration_seconds: number;
+  durationSeconds: number;
   transcript: string;
   summary: string;
   analysis: string;
-  created_at: string | null;
+  createdAt: string | null;
 }
 
 interface ScheduledCall {
   id: number;
-  phone_number: string;
-  contact_name: string | null;
-  custom_instructions: string | null;
-  scheduled_for: string | null;
+  phoneNumber: string;
+  contactName: string | null;
+  customInstructions: string | null;
+  scheduledFor: string | null;
   status: string;
-  call_sid: string | null;
-  error_message: string | null;
-  created_at: string | null;
+  callSid: string | null;
+  errorMessage: string | null;
+  createdAt: string | null;
+}
+
+interface CallConfig {
+  id: number;
+  voiceModel: string;
+  systemPrompt: string;
+  greetingPrompt: string;
+  twlPhoneNumber: string;
 }
 
 function formatDuration(seconds: number): string {
@@ -49,14 +57,16 @@ function formatDuration(seconds: number): string {
 
 function StatusBadge({ status }: { status: string }) {
   const config: Record<string, { label: string; className: string }> = {
-    completed:  { label: 'Completada',    className: 'bg-green-100 text-green-700 border-green-200' },
-    busy:       { label: 'Ocupado',       className: 'bg-amber-100 text-amber-700 border-amber-200' },
-    no_answer:  { label: 'Sin respuesta', className: 'bg-amber-100 text-amber-700 border-amber-200' },
-    failed:     { label: 'Fallida',       className: 'bg-red-100 text-red-700 border-red-200' },
-    initiated:  { label: 'Iniciando',     className: 'bg-gray-100 text-gray-600 border-gray-200' },
-    pending:    { label: 'Pendiente',     className: 'bg-indigo-100 text-indigo-700 border-indigo-200' },
-    called:     { label: 'Ejecutada',     className: 'bg-green-100 text-green-700 border-green-200' },
-    cancelled:  { label: 'Cancelada',     className: 'bg-gray-100 text-gray-500 border-gray-200' },
+    completed:   { label: 'Completada',    className: 'bg-green-100 text-green-700 border-green-200' },
+    busy:        { label: 'Ocupado',       className: 'bg-amber-100 text-amber-700 border-amber-200' },
+    'no-answer': { label: 'Sin respuesta', className: 'bg-amber-100 text-amber-700 border-amber-200' },
+    no_answer:   { label: 'Sin respuesta', className: 'bg-amber-100 text-amber-700 border-amber-200' },
+    failed:      { label: 'Fallida',       className: 'bg-red-100 text-red-700 border-red-200' },
+    initiated:   { label: 'Iniciando',     className: 'bg-gray-100 text-gray-600 border-gray-200' },
+    'in-progress': { label: 'En curso',    className: 'bg-blue-100 text-blue-700 border-blue-200' },
+    pending:     { label: 'Pendiente',     className: 'bg-indigo-100 text-indigo-700 border-indigo-200' },
+    called:      { label: 'Ejecutada',     className: 'bg-green-100 text-green-700 border-green-200' },
+    cancelled:   { label: 'Cancelada',     className: 'bg-gray-100 text-gray-500 border-gray-200' },
   };
   const c = config[status] ?? { label: status, className: 'bg-gray-100 text-gray-600 border-gray-200' };
   return (
@@ -79,27 +89,25 @@ export default function VoiceAssistant() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Form state — Llamar ahora
+  // Llamar ahora
   const [nowPhone, setNowPhone] = useState('');
+  const [nowInstructions, setNowInstructions] = useState('');
 
-  // Form state — Programar llamada
+  // Programar llamada
   const [schedPhone, setSchedPhone] = useState('');
   const [schedName, setSchedName] = useState('');
   const [schedTime, setSchedTime] = useState('');
   const [schedInstructions, setSchedInstructions] = useState('');
 
-  // Form state — Configuración de voz
+  // Configuración de voz (local edits)
   const [voice, setVoice] = useState('shimmer');
-  const [temperature, setTemperature] = useState(0.95);
-
-  // Form state — Prompts
   const [systemMessage, setSystemMessage] = useState('');
   const [greetingPrompt, setGreetingPrompt] = useState('');
 
   // Detail modal
   const [selectedCall, setSelectedCall] = useState<CallLog | null>(null);
 
-  // Default datetime to 1 min from now
+  // Default datetime 1 min from now
   useEffect(() => {
     const dt = new Date(Date.now() + 60000);
     dt.setSeconds(0, 0);
@@ -109,100 +117,91 @@ export default function VoiceAssistant() {
     );
   }, []);
 
-  // ── Queries ──────────────────────────────────────────────────────────
-  const { data: settings, isLoading: loadingSettings } = useQuery({
-    queryKey: ['voice-settings'],
+  // ── Queries ───────────────────────────────────────────────────
+
+  // Config de la empresa (voice model + prompts + config_id)
+  const { data: configRes, isLoading: loadingConfig } = useQuery({
+    queryKey: ['/api/ai-calls/config'],
     queryFn: async () => {
-      const res = await fetch(`${VOICE_BOT_URL}/settings`);
-      if (!res.ok) throw new Error('No se pudo conectar al servicio de voz');
+      const res = await apiRequest('GET', '/api/ai-calls/config');
+      if (!res.ok) throw new Error('Error cargando configuración');
       return res.json();
     },
     retry: false,
   });
 
-  const { data: promptSettings } = useQuery({
-    queryKey: ['voice-prompt-settings'],
-    queryFn: async () => {
-      const res = await fetch(`${VOICE_BOT_URL}/api/prompt-settings`);
-      if (!res.ok) throw new Error('Error cargando prompts');
-      return res.json();
-    },
-    retry: false,
-  });
+  const callConfig: CallConfig | null = configRes?.data ?? null;
+  const hasCredentials: boolean = configRes?.hasCredentials ?? false;
 
-  const { data: callLogs = [], isFetching: fetchingLogs, refetch: refetchLogs } = useQuery<CallLog[]>({
-    queryKey: ['voice-call-logs'],
+  // Sync config into local form state
+  useEffect(() => {
+    if (callConfig) {
+      setVoice(callConfig.voiceModel ?? 'shimmer');
+      setSystemMessage(callConfig.systemPrompt ?? '');
+      setGreetingPrompt(callConfig.greetingPrompt ?? '');
+    }
+  }, [callConfig]);
+
+  // Historial de llamadas
+  const { data: callLogsRes, isFetching: fetchingLogs, refetch: refetchLogs } = useQuery({
+    queryKey: ['/api/ai-calls/call-logs'],
     queryFn: async () => {
-      const res = await fetch(`${VOICE_BOT_URL}/api/call-logs`);
+      const res = await apiRequest('GET', '/api/ai-calls/call-logs');
       if (!res.ok) throw new Error('Error cargando historial');
       return res.json();
     },
     retry: false,
     refetchInterval: 30000,
+    enabled: hasCredentials,
   });
+  const callLogs: CallLog[] = callLogsRes?.data ?? [];
 
-  const { data: scheduledCalls = [], isFetching: fetchingScheduled, refetch: refetchScheduled } = useQuery<ScheduledCall[]>({
-    queryKey: ['voice-scheduled-calls'],
+  // Llamadas programadas
+  const { data: scheduledRes, isFetching: fetchingScheduled, refetch: refetchScheduled } = useQuery({
+    queryKey: ['/api/ai-calls/scheduled-calls', callConfig?.id],
     queryFn: async () => {
-      const res = await fetch(`${VOICE_BOT_URL}/api/scheduled-calls`);
+      const res = await apiRequest('GET', `/api/ai-calls/scheduled-calls/${callConfig!.id}`);
       if (!res.ok) throw new Error('Error cargando programadas');
       return res.json();
     },
     retry: false,
     refetchInterval: 30000,
+    enabled: !!callConfig?.id,
   });
+  const scheduledCalls: ScheduledCall[] = scheduledRes?.data ?? [];
 
-  // Sync settings into form state when loaded
-  useEffect(() => {
-    if (settings) {
-      setVoice(settings.voice ?? 'shimmer');
-      setTemperature(settings.temperature ?? 0.95);
-    }
-  }, [settings]);
+  // ── Mutations ─────────────────────────────────────────────────
 
-  useEffect(() => {
-    if (promptSettings) {
-      setSystemMessage(promptSettings.system_message ?? '');
-      setGreetingPrompt(promptSettings.greeting_prompt ?? '');
-    }
-  }, [promptSettings]);
-
-  // ── Mutations ─────────────────────────────────────────────────────────
   const callNow = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`${VOICE_BOT_URL}/call`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: nowPhone }),
+      const res = await apiRequest('POST', '/api/ai-calls/call', {
+        phoneNumber: nowPhone,
+        customInstructions: nowInstructions || null,
       });
       const data = await res.json();
-      if (!data.ok) throw new Error(data.error ?? 'Error al iniciar llamada');
+      if (!res.ok) throw new Error(data.error ?? 'Error al iniciar llamada');
       return data;
     },
     onSuccess: (data) => {
-      toast({ title: 'Llamada iniciada', description: `SID: ${data.sid}` });
+      toast({ title: 'Llamada iniciada', description: `SID: ${data.data?.call_sid ?? '—'}` });
       setNowPhone('');
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['voice-call-logs'] });
-      }, 3000);
+      setNowInstructions('');
+      setTimeout(() => queryClient.invalidateQueries({ queryKey: ['/api/ai-calls/call-logs'] }), 3000);
     },
     onError: (e: Error) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
   });
 
   const scheduleCall = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`${VOICE_BOT_URL}/schedule-call`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone: schedPhone,
-          contact_name: schedName || undefined,
-          scheduled_for: schedTime,
-          custom_instructions: schedInstructions || undefined,
-        }),
+      const res = await apiRequest('POST', '/api/ai-calls/scheduled-calls', {
+        callConfigurationId: callConfig!.id,
+        phoneNumber: schedPhone,
+        contactName: schedName || null,
+        scheduledFor: new Date(schedTime).toISOString(),
+        customInstructions: schedInstructions || null,
       });
       const data = await res.json();
-      if (!data.ok) throw new Error(data.error ?? 'Error al programar');
+      if (!res.ok) throw new Error(data.error ?? 'Error al programar');
       return data;
     },
     onSuccess: () => {
@@ -210,60 +209,46 @@ export default function VoiceAssistant() {
       setSchedPhone('');
       setSchedName('');
       setSchedInstructions('');
-      queryClient.invalidateQueries({ queryKey: ['voice-scheduled-calls'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/ai-calls/scheduled-calls', callConfig?.id] });
     },
     onError: (e: Error) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
   });
 
-  const saveVoiceSettings = useMutation({
+  const saveConfig = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`${VOICE_BOT_URL}/settings`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ voice, temperature }),
+      const res = await apiRequest('PATCH', '/api/ai-calls/config', {
+        voiceModel: voice,
+        systemPrompt: systemMessage,
+        greetingPrompt: greetingPrompt,
       });
       const data = await res.json();
-      if (!data.ok) throw new Error(data.error ?? 'Error al guardar');
+      if (!res.ok) throw new Error(data.error ?? 'Error al guardar');
       return data;
     },
     onSuccess: () => {
-      toast({ title: 'Configuración guardada' });
-      queryClient.invalidateQueries({ queryKey: ['voice-settings'] });
+      toast({ title: 'Configuración guardada', description: 'Aplica desde la siguiente llamada.' });
+      queryClient.invalidateQueries({ queryKey: ['/api/ai-calls/config'] });
     },
-    onError: (e: Error) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
-  });
-
-  const savePrompts = useMutation({
-    mutationFn: async () => {
-      const res = await fetch(`${VOICE_BOT_URL}/prompt-settings`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ system_message: systemMessage, greeting_prompt: greetingPrompt }),
-      });
-      const data = await res.json();
-      if (!data.ok) throw new Error(data.error ?? 'Error al guardar prompts');
-      return data;
-    },
-    onSuccess: () => toast({ title: 'Prompts guardados', description: 'Aplican desde la siguiente llamada.' }),
     onError: (e: Error) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
   });
 
   const cancelScheduled = useMutation({
-    mutationFn: async (id: number) => {
-      const res = await fetch(`${VOICE_BOT_URL}/scheduled-calls/${id}/cancel`, { method: 'POST' });
+    mutationFn: async (callSid: string) => {
+      const res = await apiRequest('DELETE', `/api/ai-calls/scheduled-calls/${callSid}`);
       const data = await res.json();
-      if (!data.ok) throw new Error(data.error ?? 'Error al cancelar');
+      if (!res.ok) throw new Error(data.error ?? 'Error al cancelar');
       return data;
     },
     onSuccess: () => {
       toast({ title: 'Llamada cancelada' });
-      queryClient.invalidateQueries({ queryKey: ['voice-scheduled-calls'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/ai-calls/scheduled-calls', callConfig?.id] });
     },
     onError: (e: Error) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
   });
 
   const pendingScheduled = scheduledCalls.filter(s => s.status === 'pending' || s.status === 'failed');
 
+  // ── Render ────────────────────────────────────────────────────
   return (
     <div className="h-screen flex flex-col overflow-hidden font-sans text-gray-800">
       <Header />
@@ -278,9 +263,27 @@ export default function VoiceAssistant() {
             </div>
             <div>
               <h1 className="text-base font-bold text-gray-900 leading-tight">Asistente de Llamadas</h1>
-              <p className="text-xs text-gray-500">Voice AI · Gestión de llamadas salientes</p>
+              <p className="text-xs text-gray-500">
+                Voice AI · Gestión de llamadas salientes
+                {callConfig?.twlPhoneNumber && (
+                  <span className="ml-2 font-mono text-indigo-600">{callConfig.twlPhoneNumber}</span>
+                )}
+              </p>
             </div>
           </div>
+
+          {/* No credentials warning */}
+          {!loadingConfig && !hasCredentials && (
+            <div className="mx-6 mt-6 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
+              <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-amber-800">Credenciales no configuradas</p>
+                <p className="text-xs text-amber-700 mt-0.5">
+                  Tu administrador debe ingresar las credenciales de Twilio y OpenAI desde el panel de administración antes de poder hacer llamadas.
+                </p>
+              </div>
+            </div>
+          )}
 
           <div className="p-6 space-y-6">
 
@@ -305,10 +308,22 @@ export default function VoiceAssistant() {
                       onChange={e => setNowPhone(e.target.value)}
                     />
                   </div>
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700">
+                      Instrucciones específicas <span className="text-gray-400 font-normal">(opcional)</span>
+                    </Label>
+                    <Textarea
+                      className="mt-1 resize-none"
+                      rows={2}
+                      placeholder="Ej: Este cliente ya preguntó sobre el precio..."
+                      value={nowInstructions}
+                      onChange={e => setNowInstructions(e.target.value)}
+                    />
+                  </div>
                   <Button
                     className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold"
                     onClick={() => callNow.mutate()}
-                    disabled={!nowPhone || callNow.isPending}
+                    disabled={!nowPhone || callNow.isPending || !hasCredentials}
                   >
                     {callNow.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <PhoneCall className="h-4 w-4 mr-2" />}
                     Llamar ahora
@@ -342,8 +357,7 @@ export default function VoiceAssistant() {
                   </div>
                   <div>
                     <Label className="text-sm font-medium text-gray-700">
-                      Instrucciones específicas{' '}
-                      <span className="text-gray-400 font-normal">(opcional)</span>
+                      Instrucciones específicas <span className="text-gray-400 font-normal">(opcional)</span>
                     </Label>
                     <Textarea
                       className="mt-1 resize-none"
@@ -356,7 +370,7 @@ export default function VoiceAssistant() {
                   <Button
                     className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold"
                     onClick={() => scheduleCall.mutate()}
-                    disabled={!schedPhone || !schedTime || scheduleCall.isPending}
+                    disabled={!schedPhone || !schedTime || scheduleCall.isPending || !hasCredentials || !callConfig?.id}
                   >
                     {scheduleCall.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                     Programar llamada
@@ -365,103 +379,78 @@ export default function VoiceAssistant() {
               </Card>
             </div>
 
-            {/* Configuración de voz */}
+            {/* Configuración de voz + Prompts */}
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                  Configuración de voz
+                  Configuración de voz y prompts
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                {loadingSettings ? (
+              <CardContent className="space-y-5">
+                {loadingConfig ? (
                   <div className="flex items-center gap-2 text-gray-400 text-sm">
                     <Loader2 className="h-4 w-4 animate-spin" /> Cargando configuración...
                   </div>
                 ) : (
-                  <div className="flex flex-wrap items-end gap-6">
-                    <div className="min-w-[200px]">
-                      <Label className="text-sm font-medium text-gray-700">Voz del asistente</Label>
-                      <Select value={voice} onValueChange={setVoice}>
-                        <SelectTrigger className="mt-1">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {AVAILABLE_VOICES.map(v => (
-                            <SelectItem key={v} value={v}>
-                              {v.charAt(0).toUpperCase() + v.slice(1)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                  <>
+                    {/* Voz */}
+                    <div className="flex flex-wrap items-end gap-6">
+                      <div className="min-w-[200px]">
+                        <Label className="text-sm font-medium text-gray-700">Voz del asistente</Label>
+                        <Select value={voice} onValueChange={setVoice}>
+                          <SelectTrigger className="mt-1">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {AVAILABLE_VOICES.map(v => (
+                              <SelectItem key={v} value={v}>
+                                {v.charAt(0).toUpperCase() + v.slice(1)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-[260px]">
-                      <Label className="text-sm font-medium text-gray-700">
-                        Temperatura:{' '}
-                        <span className="font-bold">{temperature.toFixed(2)}</span>{' '}
-                        <span className="text-gray-400 font-normal text-xs">(0.6 = precisa · 1.2 = creativa)</span>
-                      </Label>
-                      <input
-                        type="range"
-                        min={0.6}
-                        max={1.2}
-                        step={0.05}
-                        value={temperature}
-                        onChange={e => setTemperature(parseFloat(e.target.value))}
-                        className="mt-2 w-full accent-indigo-600 h-2 cursor-pointer"
+
+                    {/* System message */}
+                    <div>
+                      <Label className="text-sm font-medium text-gray-700">Mensaje del sistema (System Message)</Label>
+                      <Textarea
+                        className="mt-1 resize-y text-sm"
+                        rows={5}
+                        value={systemMessage}
+                        onChange={e => setSystemMessage(e.target.value)}
+                        placeholder="Eres un asistente de voz profesional..."
+                        disabled={!hasCredentials}
                       />
                     </div>
-                    <Button
-                      onClick={() => saveVoiceSettings.mutate()}
-                      disabled={saveVoiceSettings.isPending}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                    >
-                      {saveVoiceSettings.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                      Guardar
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
 
-            {/* Editor de prompts */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                  Editor de prompts
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">Mensaje del sistema (System Message)</Label>
-                  <Textarea
-                    className="mt-1 resize-y text-sm"
-                    rows={5}
-                    value={systemMessage}
-                    onChange={e => setSystemMessage(e.target.value)}
-                    placeholder="Eres un asistente de voz profesional..."
-                  />
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">Saludo inicial (Greeting Prompt)</Label>
-                  <Textarea
-                    className="mt-1 resize-y text-sm"
-                    rows={6}
-                    value={greetingPrompt}
-                    onChange={e => setGreetingPrompt(e.target.value)}
-                    placeholder="INICIO DE LLAMADA: ..."
-                  />
-                </div>
-                <div className="flex items-center gap-4">
-                  <Button
-                    onClick={() => savePrompts.mutate()}
-                    disabled={savePrompts.isPending}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                  >
-                    {savePrompts.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                    Guardar prompts
-                  </Button>
-                  <span className="text-xs text-gray-400">Los cambios aplican desde la siguiente llamada, sin reiniciar el servidor.</span>
-                </div>
+                    {/* Greeting prompt */}
+                    <div>
+                      <Label className="text-sm font-medium text-gray-700">Saludo inicial (Greeting Prompt)</Label>
+                      <Textarea
+                        className="mt-1 resize-y text-sm"
+                        rows={6}
+                        value={greetingPrompt}
+                        onChange={e => setGreetingPrompt(e.target.value)}
+                        placeholder="INICIO DE LLAMADA: ..."
+                        disabled={!hasCredentials}
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                      <Button
+                        onClick={() => saveConfig.mutate()}
+                        disabled={saveConfig.isPending || !hasCredentials}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                      >
+                        {saveConfig.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                        Guardar configuración
+                      </Button>
+                      <span className="text-xs text-gray-400">Los cambios aplican desde la siguiente llamada.</span>
+                    </div>
+                  </>
+                )}
               </CardContent>
             </Card>
 
@@ -499,23 +488,23 @@ export default function VoiceAssistant() {
                       pendingScheduled.map(sc => (
                         <TableRow key={sc.id}>
                           <TableCell className="text-sm">
-                            {sc.contact_name && <div className="font-semibold text-gray-900">{sc.contact_name}</div>}
-                            <div className="text-gray-600">{sc.phone_number}</div>
+                            {sc.contactName && <div className="font-semibold text-gray-900">{sc.contactName}</div>}
+                            <div className="text-gray-600">{sc.phoneNumber}</div>
                           </TableCell>
-                          <TableCell className="text-sm text-gray-600">{formatDate(sc.scheduled_for)}</TableCell>
+                          <TableCell className="text-sm text-gray-600">{formatDate(sc.scheduledFor)}</TableCell>
                           <TableCell>
                             <StatusBadge status={sc.status} />
-                            {sc.error_message && (
-                              <div className="text-xs text-red-500 mt-1">{sc.error_message}</div>
+                            {sc.errorMessage && (
+                              <div className="text-xs text-red-500 mt-1">{sc.errorMessage}</div>
                             )}
                           </TableCell>
                           <TableCell>
-                            {sc.status === 'pending' && (
+                            {sc.status === 'pending' && sc.callSid && (
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 className="text-red-500 hover:text-red-700 hover:bg-red-50 text-xs"
-                                onClick={() => cancelScheduled.mutate(sc.id)}
+                                onClick={() => cancelScheduled.mutate(sc.callSid!)}
                                 disabled={cancelScheduled.isPending}
                               >
                                 <X className="h-3 w-3 mr-1" />
@@ -569,10 +558,10 @@ export default function VoiceAssistant() {
                           className="cursor-pointer hover:bg-gray-50"
                           onClick={() => setSelectedCall(log)}
                         >
-                          <TableCell className="text-sm font-medium text-gray-900">{log.phone_number || '-'}</TableCell>
+                          <TableCell className="text-sm font-medium text-gray-900">{log.phoneNumber || '-'}</TableCell>
                           <TableCell><StatusBadge status={log.status} /></TableCell>
-                          <TableCell className="text-sm text-gray-600">{formatDuration(log.duration_seconds)}</TableCell>
-                          <TableCell className="text-sm text-gray-600">{formatDate(log.created_at)}</TableCell>
+                          <TableCell className="text-sm text-gray-600">{formatDuration(log.durationSeconds)}</TableCell>
+                          <TableCell className="text-sm text-gray-600">{formatDate(log.createdAt)}</TableCell>
                           <TableCell>
                             <Button variant="ghost" size="sm" className="text-indigo-600 hover:text-indigo-700 text-xs">
                               Ver detalle <ChevronRight className="h-3 w-3 ml-1" />
@@ -603,7 +592,7 @@ export default function VoiceAssistant() {
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
               <div>
                 <h2 className="text-base font-bold text-gray-900">Detalle de llamada</h2>
-                <p className="text-sm text-gray-500">{selectedCall.phone_number} · {formatDate(selectedCall.created_at)}</p>
+                <p className="text-sm text-gray-500">{selectedCall.phoneNumber} · {formatDate(selectedCall.createdAt)}</p>
               </div>
               <button onClick={() => setSelectedCall(null)} className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100">
                 <X className="h-5 w-5" />
@@ -612,8 +601,8 @@ export default function VoiceAssistant() {
             <div className="px-6 py-4 space-y-5">
               <div className="flex items-center gap-4 text-sm text-gray-600 flex-wrap">
                 <StatusBadge status={selectedCall.status} />
-                <span>Duración: <strong>{formatDuration(selectedCall.duration_seconds)}</strong></span>
-                <span className="font-mono text-xs text-gray-400">{selectedCall.call_sid}</span>
+                <span>Duración: <strong>{formatDuration(selectedCall.durationSeconds)}</strong></span>
+                <span className="font-mono text-xs text-gray-400">{selectedCall.callSid}</span>
               </div>
 
               {selectedCall.summary && (

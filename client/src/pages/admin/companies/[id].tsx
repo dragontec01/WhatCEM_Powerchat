@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, ArrowLeft, Save, Trash, LogIn, UserCog, Upload, Edit, X } from "lucide-react";
+import { Loader2, ArrowLeft, Save, Trash, LogIn, UserCog, Upload, Edit, X, Phone, Eye, EyeOff } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Dialog,
@@ -196,6 +196,16 @@ export default function CompanyDetailPage() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("details");
   const [isImpersonateDialogOpen, setIsImpersonateDialogOpen] = useState(false);
+
+  // IA Calls tab state
+  const [callConfig, setCallConfig] = useState({
+    openaiApiKey: "",
+    twlAccountSid: "",
+    twlAuthToken: "",
+    twlPhoneNumber: "",
+  });
+  const [showOpenaiKey, setShowOpenaiKey] = useState(false);
+  const [showTwilioToken, setShowTwilioToken] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -394,6 +404,67 @@ export default function CompanyDetailPage() {
     }
   });
 
+  // ── IA Calls: fetch existing config ─────────────────────────
+  const { data: callConfigData, isLoading: isLoadingCallConfig } = useQuery({
+    queryKey: [`/api/admin/companies/${companyId}/call-configuration`],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/admin/companies/${companyId}/call-configuration`);
+      if (!res.ok) throw new Error("Failed to fetch call configuration");
+      return res.json();
+    },
+    enabled: !!companyId && !!user?.isSuperAdmin,
+  });
+
+  useEffect(() => {
+    if (callConfigData?.data) {
+      const cfg = callConfigData.data;
+      setCallConfig({
+        openaiApiKey: cfg.openaiApiKey ?? "",
+        twlAccountSid: cfg.twlAccountSid ?? "",
+        twlAuthToken: cfg.twlAuthToken ?? "",
+        twlPhoneNumber: cfg.twlPhoneNumber ?? "",
+      });
+    }
+  }, [callConfigData]);
+
+  // ── IA Calls: save config ────────────────────────────────────
+  const saveCallConfigMutation = useMutation({
+    mutationFn: async (data: typeof callConfig) => {
+      const res = await apiRequest("PUT", `/api/admin/companies/${companyId}/call-configuration`, data);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to save call configuration");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Configuration saved", description: "AI call settings updated successfully." });
+      queryClient.invalidateQueries({ queryKey: [`/api/admin/companies/${companyId}/call-configuration`] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Save failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteCallCredentialsMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("DELETE", `/api/admin/companies/${companyId}/call-configuration`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to clear credentials");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      setCallConfig({ openaiApiKey: "", twlAccountSid: "", twlAuthToken: "", twlPhoneNumber: "" });
+      toast({ title: "Credenciales borradas", description: "Las credenciales del asistente de llamadas fueron eliminadas." });
+      queryClient.invalidateQueries({ queryKey: [`/api/admin/companies/${companyId}/call-configuration`] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
   const onSubmit = (data: CompanyFormValues) => {
     updateMutation.mutate(data);
   };
@@ -542,6 +613,10 @@ export default function CompanyDetailPage() {
             <TabsTrigger value="details">Company Details</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="data">Data & Usage</TabsTrigger>
+            <TabsTrigger value="ia-calls" className="flex items-center gap-1.5">
+              <Phone className="h-3.5 w-3.5" />
+              IA Calls
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="details">
@@ -1027,6 +1102,180 @@ export default function CompanyDetailPage() {
 
           <TabsContent value="data">
             {companyId && <DataUsageTab companyId={companyId} />}
+          </TabsContent>
+
+          {/* ── IA Calls Tab ────────────────────────────────────────── */}
+          <TabsContent value="ia-calls">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Phone className="h-5 w-5 text-indigo-600" />
+                  AI Voice Call Configuration
+                </CardTitle>
+                <CardDescription>
+                  Twilio and OpenAI credentials for this company's AI call assistant.
+                  Each company uses its own resources (Twilio number, OpenAI key).
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoadingCallConfig ? (
+                  <div className="flex justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+
+                    {/* OpenAI */}
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3 pb-1 border-b">
+                        OpenAI
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="md:col-span-2">
+                          <Label htmlFor="openaiApiKey" className="text-sm font-medium">
+                            API Key <span className="text-gray-400 font-normal">(OPENAI_API_KEY)</span>
+                          </Label>
+                          <div className="relative mt-1">
+                            <Input
+                              id="openaiApiKey"
+                              type={showOpenaiKey ? "text" : "password"}
+                              placeholder="sk-proj-..."
+                              value={callConfig.openaiApiKey}
+                              onChange={e => setCallConfig(c => ({ ...c, openaiApiKey: e.target.value }))}
+                              className="pr-10 font-mono text-sm"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowOpenaiKey(v => !v)}
+                              className="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600"
+                            >
+                              {showOpenaiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </button>
+                          </div>
+                        </div>
+
+                      </div>
+                    </div>
+
+                    {/* Twilio */}
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3 pb-1 border-b">
+                        Twilio
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="twlAccountSid" className="text-sm font-medium">
+                            Account SID <span className="text-gray-400 font-normal">(TWILIO_ACCOUNT_SID)</span>
+                          </Label>
+                          <Input
+                            id="twlAccountSid"
+                            placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                            value={callConfig.twlAccountSid}
+                            onChange={e => setCallConfig(c => ({ ...c, twlAccountSid: e.target.value }))}
+                            className="mt-1 font-mono text-sm"
+                          />
+                        </div>
+
+                        <div>
+                          <Label htmlFor="twlAuthToken" className="text-sm font-medium">
+                            Auth Token <span className="text-gray-400 font-normal">(TWILIO_AUTH_TOKEN)</span>
+                          </Label>
+                          <div className="relative mt-1">
+                            <Input
+                              id="twlAuthToken"
+                              type={showTwilioToken ? "text" : "password"}
+                              placeholder="••••••••••••••••••••••••••••••••"
+                              value={callConfig.twlAuthToken}
+                              onChange={e => setCallConfig(c => ({ ...c, twlAuthToken: e.target.value }))}
+                              className="pr-10 font-mono text-sm"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowTwilioToken(v => !v)}
+                              className="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600"
+                            >
+                              {showTwilioToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </button>
+                          </div>
+                        </div>
+
+                        <div>
+                          <Label htmlFor="twlPhoneNumber" className="text-sm font-medium">
+                            From Number <span className="text-gray-400 font-normal">(TWILIO_FROM_NUMBER)</span>
+                          </Label>
+                          <Input
+                            id="twlPhoneNumber"
+                            placeholder="+52XXXXXXXXXX"
+                            value={callConfig.twlPhoneNumber}
+                            onChange={e => setCallConfig(c => ({ ...c, twlPhoneNumber: e.target.value }))}
+                            className="mt-1 font-mono text-sm"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Action buttons */}
+                    <div className="flex items-center justify-between pt-2">
+                      {/* Clear credentials */}
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className="border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300"
+                            disabled={deleteCallCredentialsMutation.isPending || (!callConfig.openaiApiKey && !callConfig.twlAccountSid && !callConfig.twlAuthToken && !callConfig.twlPhoneNumber)}
+                          >
+                            {deleteCallCredentialsMutation.isPending ? (
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash className="mr-2 h-4 w-4" />
+                            )}
+                            Borrar credenciales
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>¿Borrar credenciales del asistente de llamadas?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Se eliminarán la clave de OpenAI, las credenciales de Twilio y el número de teléfono de esta empresa.
+                              Los prompts y la configuración de voz se conservan. Esta acción no se puede deshacer.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              className="bg-red-600 hover:bg-red-700"
+                              onClick={() => deleteCallCredentialsMutation.mutate()}
+                            >
+                              Sí, borrar credenciales
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+
+                      {/* Save */}
+                      <Button
+                        onClick={() => saveCallConfigMutation.mutate(callConfig)}
+                        disabled={saveCallConfigMutation.isPending}
+                        className="btn-brand-primary"
+                        variant="brand"
+                      >
+                        {saveCallConfigMutation.isPending ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="mr-2 h-4 w-4" />
+                            Guardar configuración
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
 

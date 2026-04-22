@@ -53,12 +53,14 @@ export const flowStatusTypes = z.enum([
 const calendarNodeTypes = ['google_calendar_event', 'google_calendar_availability'] as const;
 const aiNodeTypes = ['ai_assistant'] as const;
 const pipelineNodeTypes = ['update_pipeline_stage'] as const;
+const aiCallNodeTypes = ['ai_call'] as const;
 
 export const updatedFlowNodeTypes = [
   ...flowNodeTypes.options,
   ...calendarNodeTypes,
   ...aiNodeTypes,
-  ...pipelineNodeTypes
+  ...pipelineNodeTypes,
+  ...aiCallNodeTypes
 ];
 
 export const flows = pgTable("flows", {

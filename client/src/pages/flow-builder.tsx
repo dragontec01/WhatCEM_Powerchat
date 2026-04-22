@@ -22,6 +22,7 @@ import { WhatsAppFlowsNode } from '@/components/flow-builder/WhatsAppFlowsNode';
 import { TranslationNode } from '@/components/flow-builder/TranslationNode';
 import { TypebotNode } from '@/components/flow-builder/TypebotNode';
 import UpdatePipelineStageNode from '@/components/flow-builder/UpdatePipelineStageNode';
+import AiCallNode from '@/components/flow-builder/AiCallNode';
 import { WebhookNode } from '@/components/flow-builder/WebhookNode';
 import BotIcon from '@/components/ui/bot-icon';
 import { Button } from '@/components/ui/button';
@@ -84,7 +85,8 @@ import {
   Workflow,
   X,
   Zap,
-  Code
+  Code,
+  PhoneCall
 } from 'lucide-react';
 import { nanoid } from 'nanoid';
 import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
@@ -4781,7 +4783,8 @@ const nodeTypes: NodeTypes = {
   documind: DocumindNode,
   chat_pdf: ChatPdfNode,
   bot_disable: BotDisableNode,
-  bot_reset: BotResetNode
+  bot_reset: BotResetNode,
+  ai_call: AiCallNode,
 };
 
 const CustomEdge = ({
@@ -4928,6 +4931,7 @@ function NodeSelector({ onAdd, nodes }: { onAdd: (type: string) => void; nodes: 
     { type: 'ai_assistant', name: t('flow_builder.node_types.ai_assistant', 'AI Assistant'), section: t('flow_builder.sections.flow_control', 'Flow Control'), icon: ({ className }: { className?: string }) => <BotIcon className={className} size={16} />, color: 'text-violet-500', ...getSingletonNodeState('ai_assistant') },
     { type: 'translation', name: t('flow_builder.node_types.translation', 'Translation'), section: t('flow_builder.sections.flow_control', 'Flow Control'), icon: Languages, color: 'text-blue-600', disabled: false },
     { type: 'update_pipeline_stage', name: t('flow_builder.node_types.pipeline', 'Pipeline'), section: t('flow_builder.sections.flow_control', 'Flow Control'), icon: ArrowRightCircle, color: 'text-teal-500', disabled: false },
+    { type: 'ai_call', name: t('flow_builder.node_types.ai_call', 'Llamada IA'), section: t('flow_builder.sections.flow_control', 'Flow Control'), icon: PhoneCall, color: 'text-indigo-600', disabled: false },
     { type: 'bot_disable', name: t('flow_builder.node_types.agent_handoff', 'Agent Handoff'), section: t('flow_builder.sections.flow_control', 'Flow Control'), icon: UserCheck, color: 'text-orange-600', disabled: false },
     { type: 'n8n', name: t('flow_builder.node_types.n8n', 'n8n'), section: t('flow_builder.sections.integrations', 'Integrations'), icon: Workflow, color: 'text-orange-600', disabled: false },
     { type: 'make', name: t('flow_builder.node_types.make_com', 'Make.com'), section: t('flow_builder.sections.integrations', 'Integrations'), icon: Zap, color: 'text-blue-600', disabled: false },

@@ -49,6 +49,8 @@ export enum NodeType {
 
   UPDATE_PIPELINE_STAGE = 'updatePipelineStage',
 
+  AI_CALL = 'ai_call',
+
   TRIGGER = 'trigger'
 }
 

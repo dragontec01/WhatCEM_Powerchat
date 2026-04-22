@@ -1,4 +1,8 @@
 import { storage } from '../storage';
+import { db } from '../db.js';
+import { callConfiguration } from '../../shared/db/schema/calls_ai.js';
+import { eq } from 'drizzle-orm';
+import AICallsService from './ai-calls.js';
 import {
   FlowAssignment,
   Message,
@@ -108,6 +112,8 @@ interface SessionVariable {
  * Enhanced Flow Executor Service - Session-Aware Flow Execution
  * Implements sequential node processing with persistent session management
  */
+const aiCallsService = new AICallsService();
+
 class FlowExecutor extends EventEmitter {
   private executionManager: FlowExecutionManager;
   private webSocketClients: Map<string, any> = new Map();
@@ -2216,6 +2222,10 @@ class FlowExecutor extends EventEmitter {
 
         case NodeType.UPDATE_PIPELINE_STAGE:
           await this.executeUpdatePipelineStageNodeWithContext(node, context, conversation, contact, channelConnection);
+          break;
+
+        case NodeType.AI_CALL:
+          await this.executeAiCallNodeWithContext(node, context, conversation, contact, channelConnection);
           break;
 
         case NodeType.TRIGGER:
@@ -13053,6 +13063,131 @@ IMPORTANT: These calendar behaviors are enforced and cannot be overridden by use
 
     } catch (error) {
       context.setVariable('calendar.error', error instanceof Error ? error.message : 'Unknown error');
+    }
+  }
+
+  /**
+   * Execute AI Call node — triggers one or more outbound AI voice calls in parallel.
+   * Supports new multi-phone format (data.phoneEntries[]) and legacy single-phone format.
+   * All phone number fields support {{variable}} interpolation.
+   */
+  private async executeAiCallNodeWithContext(
+    node: any,
+    context: FlowExecutionContext,
+    conversation: Conversation,
+    _contact: Contact,
+    _channelConnection: ChannelConnection
+  ): Promise<void> {
+    const data = node.data || {};
+    const companyId = conversation.companyId;
+
+    if (!companyId) {
+      logger.error('flow-executor', `AI Call node ${node.id}: no companyId on conversation`);
+      context.setVariable('aiCall.error', 'No company ID found for this conversation');
+      return;
+    }
+
+    // Resolve global custom instructions (applies to all entries)
+    const globalInstructions = data.customInstructions
+      ? context.replaceVariables(String(data.customInstructions))
+      : null;
+
+    // Build entries list — new multi-phone array format takes priority over legacy single-phone fields
+    type CallEntry = { phone: string; contactName: string | null; customInstructions: string | null };
+    let entries: CallEntry[];
+
+    if (data.phoneEntries && Array.isArray(data.phoneEntries) && data.phoneEntries.length > 0) {
+      entries = (data.phoneEntries as Array<{ phone: string; contactName: string }>).map(entry => ({
+        phone:              entry.phone       ? context.replaceVariables(entry.phone)       : '',
+        contactName:        entry.contactName ? context.replaceVariables(entry.contactName) : null,
+        customInstructions: globalInstructions,
+      }));
+    } else {
+      // Legacy single-phone format
+      const rawPhone = data.phoneNumber ?? '';
+      const rawName  = data.contactName ?? '';
+      entries = [{
+        phone:              rawPhone ? context.replaceVariables(rawPhone) : '',
+        contactName:        rawName  ? context.replaceVariables(rawName)  : null,
+        customInstructions: globalInstructions,
+      }];
+    }
+
+    // Remove entries with empty phone numbers
+    entries = entries.filter(e => e.phone.trim());
+
+    if (entries.length === 0) {
+      logger.warn('flow-executor', `AI Call node ${node.id}: no valid phone numbers after variable resolution`);
+      context.setVariable('aiCall.error', 'No valid phone numbers configured');
+      return;
+    }
+
+    try {
+      const [config] = await db
+        .select({
+          id:             callConfiguration.id,
+          systemPrompt:   callConfiguration.systemPrompt,
+          greetingPrompt: callConfiguration.greetingPrompt,
+          voiceModel:     callConfiguration.voiceModel,
+        })
+        .from(callConfiguration)
+        .where(eq(callConfiguration.companyId, companyId))
+        .limit(1);
+
+      if (!config) {
+        logger.warn('flow-executor', `AI Call node ${node.id}: no call configuration found for companyId ${companyId}`);
+        context.setVariable('aiCall.error', 'No call configuration found. Ask your administrator to set up credentials.');
+        return;
+      }
+
+      const webhookUrl = `${process.env.APP_PUBLIC_URL || ''}/api/ai-calls/webhook`;
+
+      // Fire all calls in parallel — each is independent, one failure doesn't block others
+      const results = await Promise.allSettled(
+        entries.map(entry =>
+          aiCallsService.makeCall({
+            config_id:           config.id,
+            to:                  entry.phone.trim(),
+            contact_name:        entry.contactName,
+            custom_instructions: entry.customInstructions,
+            webhook_url:         webhookUrl || null,
+            system_prompt:       config.systemPrompt   ?? null,
+            greeting_prompt:     config.greetingPrompt ?? null,
+            voice_model:         config.voiceModel     ?? null,
+          })
+        )
+      );
+
+      const callSids: string[] = [];
+      const errors:   string[] = [];
+
+      results.forEach((result, i) => {
+        if (result.status === 'fulfilled') {
+          const sid = result.value?.call_sid ?? result.value?.callSid ?? '';
+          if (sid) callSids.push(sid);
+          logger.info('flow-executor', `AI Call node ${node.id}: call to ${entries[i].phone} initiated — SID ${sid || 'unknown'}`);
+        } else {
+          const msg = result.reason instanceof Error ? result.reason.message : String(result.reason);
+          errors.push(`${entries[i].phone}: ${msg}`);
+          logger.error('flow-executor', `AI Call node ${node.id}: error calling ${entries[i].phone} — ${msg}`);
+        }
+      });
+
+      // Set context variables (legacy aiCall.callSid kept for backward compat with single-call flows)
+      context.setVariable('aiCall.callSids',     callSids);
+      context.setVariable('aiCall.callSid',      callSids[0] ?? '');
+      context.setVariable('aiCall.count',        entries.length);
+      context.setVariable('aiCall.successCount', callSids.length);
+      context.setVariable('aiCall.failCount',    errors.length);
+      context.setVariable('aiCall.phoneNumber',  entries[0]?.phone ?? '');
+      context.setVariable('aiCall.status',       callSids.length > 0 ? 'initiated' : 'failed');
+      if (errors.length > 0) {
+        context.setVariable('aiCall.error', errors.join('; '));
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      logger.error('flow-executor', `AI Call node ${node.id}: unexpected error — ${msg}`);
+      context.setVariable('aiCall.error', msg);
     }
   }
 
