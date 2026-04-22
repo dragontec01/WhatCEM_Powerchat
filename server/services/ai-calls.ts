@@ -47,6 +47,16 @@ class AICallsService {
             throw error;
         }
     }
+    
+    async makeCall(payload: Record<string, unknown>) {
+        try {
+            const response = await this.aiCallsService.post("/api/v1/call", payload);
+            return response.data;
+        } catch (error) {
+            console.error("Error scheduling call:", (error as AxiosError)?.response?.data || error);
+            throw error;
+        }
+    }
 
     /** POST /scheduled-calls/:id/cancel — cancels a pending scheduled call */
     async cancelScheduledCall(id: string | number) {
