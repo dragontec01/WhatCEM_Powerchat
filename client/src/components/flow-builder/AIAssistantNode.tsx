@@ -228,7 +228,11 @@ interface Provider {
 
 
 const OPENAI_MODELS = [
-  { id: 'gpt-4o', name: 'GPT-4o (Latest)', supportsTools: true },
+  { id: 'gpt-5.4', name: 'GPT-5.4 (Latest)', supportsTools: true },
+  { id: 'gpt-5.4-nano', name: 'GPT-5.4 Nano', supportsTools: true },
+  { id: 'gpt-5-mini', name: 'GPT-5 Mini', supportsTools: true },
+  { id: 'gpt-5-nano', name: 'GPT-5 Nano', supportsTools: true },
+  { id: 'gpt-4o', name: 'GPT-4o', supportsTools: true },
   { id: 'gpt-4o-mini', name: 'GPT-4o Mini', supportsTools: true },
   { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', supportsTools: true },
   { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', supportsTools: true }
@@ -236,7 +240,11 @@ const OPENAI_MODELS = [
 
 
 const FALLBACK_OPENROUTER_MODELS = [
+  { id: 'openai/gpt-5.4', name: 'GPT-5.4 (via OpenRouter)', supportsTools: true },
+  { id: 'openai/gpt-5.4-nano', name: 'GPT-5.4 Nano (via OpenRouter)', supportsTools: true },
   { id: 'openai/gpt-5', name: 'GPT-5 (via OpenRouter)', supportsTools: true },
+  { id: 'openai/gpt-5-mini', name: 'GPT-5 Mini (via OpenRouter)', supportsTools: true },
+  { id: 'openai/gpt-5-nano', name: 'GPT-5 Nano (via OpenRouter)', supportsTools: true },
   { id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini (via OpenRouter)', supportsTools: true },
   { id: 'openai/gpt-4o', name: 'GPT-4o (via OpenRouter)', supportsTools: true },
   { id: 'openai/gpt-oss-20b', name: 'GPT OSS 20B (OpenAI)', supportsTools: true },

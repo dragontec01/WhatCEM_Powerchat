@@ -356,12 +356,16 @@ export class AiCredentialsService {
 
     const pricingTable: Record<string, Record<string, { input: number; output: number }>> = {
       openai: {
+        'gpt-5.4': { input: 0.002, output: 0.008 },
+        'gpt-5.4-nano': { input: 0.0001, output: 0.0004 },
+        'gpt-5-mini': { input: 0.0003, output: 0.0012 },
+        'gpt-5-nano': { input: 0.0001, output: 0.0004 },
         'gpt-4o': { input: 0.0025, output: 0.01 },
         'gpt-4o-mini': { input: 0.00015, output: 0.0006 },
         'gpt-4-turbo': { input: 0.01, output: 0.03 },
         'gpt-4': { input: 0.03, output: 0.06 },
         'gpt-3.5-turbo': { input: 0.0005, output: 0.0015 },
-        'default': { input: 0.0025, output: 0.01 }
+        'default': { input: 0.002, output: 0.008 }
       },
       openrouter: {
 
