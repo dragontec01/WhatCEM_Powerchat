@@ -46,6 +46,10 @@ const FUNCTION_CALLING_SUPPORTED_MODELS = new Set([
 
 
   'openai/gpt-5',
+  'openai/gpt-5.4',
+  'openai/gpt-5.4-nano',
+  'openai/gpt-5-mini',
+  'openai/gpt-5-nano',
 
 
   'openai/gpt-4o',
@@ -144,7 +148,11 @@ const FUNCTION_CALLING_SUPPORTED_MODELS = new Set([
 
 
 const FALLBACK_MODELS: ProcessedModel[] = [
+  { id: 'openai/gpt-5.4', name: 'GPT-5.4 (via OpenRouter)', supportsTools: true },
+  { id: 'openai/gpt-5.4-nano', name: 'GPT-5.4 Nano (via OpenRouter)', supportsTools: true },
   { id: 'openai/gpt-5', name: 'GPT-5 (via OpenRouter)', supportsTools: true },
+  { id: 'openai/gpt-5-mini', name: 'GPT-5 Mini (via OpenRouter)', supportsTools: true },
+  { id: 'openai/gpt-5-nano', name: 'GPT-5 Nano (via OpenRouter)', supportsTools: true },
   { id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini (via OpenRouter)', supportsTools: true },
   { id: 'openai/gpt-4o', name: 'GPT-4o (via OpenRouter)', supportsTools: true },
   { id: 'openai/gpt-oss-20b', name: 'GPT OSS 20B (OpenAI)', supportsTools: true },

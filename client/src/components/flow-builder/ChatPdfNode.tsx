@@ -71,9 +71,33 @@ export function ChatPdfNode({ id, data, isConnectable }: ChatPdfNodeProps) {
 
   const GPT_MODELS = [
     {
+      id: 'gpt-5.4',
+      name: 'GPT-5.4',
+      description: t('flow_builder.chatpdf_gpt54_description', 'Latest GPT-5.4 model (2 credits per message)'),
+      credits: 2
+    },
+    {
+      id: 'gpt-5.4-nano',
+      name: 'GPT-5.4 Nano',
+      description: t('flow_builder.chatpdf_gpt54_nano_description', 'GPT-5.4 Nano model (1 credit per message)'),
+      credits: 1
+    },
+    {
+      id: 'gpt-5-mini',
+      name: 'GPT-5 Mini',
+      description: t('flow_builder.chatpdf_gpt5_mini_description', 'GPT-5 Mini model (1 credit per message)'),
+      credits: 1
+    },
+    {
+      id: 'gpt-5-nano',
+      name: 'GPT-5 Nano',
+      description: t('flow_builder.chatpdf_gpt5_nano_description', 'GPT-5 Nano model (1 credit per message)'),
+      credits: 1
+    },
+    {
       id: 'gpt-4o',
       name: 'GPT-4o',
-      description: t('flow_builder.chatpdf_gpt4o_description', 'Latest GPT-4 model (2 credits per message)'),
+      description: t('flow_builder.chatpdf_gpt4o_description', 'GPT-4o model (2 credits per message)'),
       credits: 2
     },
     {

@@ -452,8 +452,20 @@ class OpenAIProvider implements AIProviderInterface {
         case 'gpt-3.5-turbo':
           modelToUse = "gpt-3.5-turbo";
           break;
+        case 'gpt-5-mini':
+          modelToUse = "gpt-5-mini";
+          break;
+        case 'gpt-5-nano':
+          modelToUse = "gpt-5-nano";
+          break;
+        case 'gpt-5.4-nano':
+          modelToUse = "gpt-5.4-nano";
+          break;
+        case 'gpt-5.4':
+          modelToUse = "gpt-5.4";
+          break;
         default:
-          modelToUse = "gpt-4-turbo";
+          modelToUse = "gpt-5.4";
       }
 
       let maxTokens = 4096;
@@ -468,7 +480,7 @@ class OpenAIProvider implements AIProviderInterface {
         model: modelToUse,
         messages: apiMessages,
         temperature: temperature,
-        max_tokens: maxTokens
+        [modelToUse.startsWith("gpt-5") ? "max_completion_tokens" : "max_tokens"]: maxTokens
       };
 
       if (options.enableFunctionCalling && options.functionDefinitions) {
