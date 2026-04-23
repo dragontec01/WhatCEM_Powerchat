@@ -17,10 +17,11 @@ import {
   insertFlowSchema,
   insertNoteSchema,
   invitationStatusTypes,
-  insertCompanyPageSchema
+  insertCompanyPageSchema,
+  quickReplyTemplates
 } from "@shared/db/schema";
 import crypto, { randomBytes, scrypt, timingSafeEqual } from "crypto";
-import { eq, and } from "drizzle-orm";
+import { eq, and, not } from "drizzle-orm";
 import { EventEmitter } from "events";
 import type { Express, Request, Response, NextFunction } from "express";
 import express from "express";
@@ -3733,6 +3734,38 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
   const CONNECTION_TIMEOUT = 300000;
   const PING_INTERVAL = 30000;
 
+  type ConnectionOwner = { companyId: number | null; userId: number | null };
+  const connectionOwnerCache = new Map<number, { owner: ConnectionOwner | null; expiresAt: number }>();
+  const OWNER_CACHE_TTL = 5 * 60 * 1000;
+
+  const resolveConnectionOwner = async (connectionId: number): Promise<ConnectionOwner | null> => {
+    const now = Date.now();
+    const cached = connectionOwnerCache.get(connectionId);
+    if (cached && cached.expiresAt > now) return cached.owner;
+    try {
+      const connection = await storage.getChannelConnection(connectionId);
+      const owner: ConnectionOwner | null = connection
+        ? { companyId: connection.companyId ?? null, userId: connection.userId ?? null }
+        : null;
+      connectionOwnerCache.set(connectionId, { owner, expiresAt: now + OWNER_CACHE_TTL });
+      return owner;
+    } catch (error) {
+      logger.error('websocket', `Failed to resolve owner for connection ${connectionId}:`, error);
+      return null;
+    }
+  };
+
+  const clientOwnsConnection = (
+    client: { userId?: number; companyId?: number },
+    owner: ConnectionOwner | null,
+  ): boolean => {
+    if (!owner) return false;
+    if (owner.companyId != null && client.companyId != null) {
+      return owner.companyId === client.companyId;
+    }
+    return owner.userId != null && owner.userId === client.userId;
+  };
+
   const cleanupClient = (clientId: string) => {
     const client = clients.get(clientId);
     if (client) {
@@ -3797,6 +3830,13 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       }
     }, PING_INTERVAL);
 
+    ws.on('pong', () => {
+      const client = clients.get(clientId);
+      if (client) {
+        client.lastActivity = new Date();
+      }
+    });
+
     const authTimeout = setTimeout(() => {
       const client = clients.get(clientId);
       if (client && !client.isAuthenticated) {
@@ -3859,45 +3899,52 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         const qrCache = new Map<number, { qrCode: string; timestamp: number }>();
         const QR_CACHE_TTL = 12000; // 12 seconds TTL
 
-        const unsubscribeQrCode = whatsAppService.subscribeToEvents('qrCode', (data) => {
-          if (data && ws.readyState === WebSocket.OPEN) {
-            const cached = qrCache.get(data.connectionId);
-            const now = Date.now();
-            const shouldSend = !cached || 
-                             cached.qrCode !== data.qrCode || 
-                             (now - cached.timestamp) > QR_CACHE_TTL;
-            
-            if (shouldSend) {
-              const message = {
-                type: 'whatsappQrCode',
-                connectionId: data.connectionId,
-                qrCode: data.qrCode
-              };
-              
-              ws.send(JSON.stringify(message));
-              qrCache.set(data.connectionId, { qrCode: data.qrCode, timestamp: now });
-            }
+        const unsubscribeQrCode = whatsAppService.subscribeToEvents('qrCode', async (data) => {
+          if (!data || ws.readyState !== WebSocket.OPEN) return;
+          const owner = await resolveConnectionOwner(data.connectionId);
+          const client = clients.get(clientId);
+          if (!client || !clientOwnsConnection(client, owner)) return;
+
+          const cached = qrCache.get(data.connectionId);
+          const now = Date.now();
+          const shouldSend = !cached ||
+                           cached.qrCode !== data.qrCode ||
+                           (now - cached.timestamp) > QR_CACHE_TTL;
+
+          if (shouldSend) {
+            ws.send(JSON.stringify({
+              type: 'whatsappQrCode',
+              connectionId: data.connectionId,
+              qrCode: data.qrCode
+            }));
+            qrCache.set(data.connectionId, { qrCode: data.qrCode, timestamp: now });
           }
         });
 
-        const unsubscribeConnectionStatus = whatsAppService.subscribeToEvents('connectionStatusUpdate', (data) => {
-          if (data && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({
-              type: 'whatsappConnectionStatus',
-              connectionId: data.connectionId,
-              status: data.status
-            }));
-          }
+        const unsubscribeConnectionStatus = whatsAppService.subscribeToEvents('connectionStatusUpdate', async (data) => {
+          if (!data || ws.readyState !== WebSocket.OPEN) return;
+          const owner = await resolveConnectionOwner(data.connectionId);
+          const client = clients.get(clientId);
+          if (!client || !clientOwnsConnection(client, owner)) return;
+
+          ws.send(JSON.stringify({
+            type: 'whatsappConnectionStatus',
+            connectionId: data.connectionId,
+            status: data.status
+          }));
         });
 
-        const unsubscribeConnectionError = whatsAppService.subscribeToEvents('connectionError', (data) => {
-          if (data && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({
-              type: 'whatsappConnectionError',
-              connectionId: data.connectionId,
-              error: data.error
-            }));
-          }
+        const unsubscribeConnectionError = whatsAppService.subscribeToEvents('connectionError', async (data) => {
+          if (!data || ws.readyState !== WebSocket.OPEN) return;
+          const owner = await resolveConnectionOwner(data.connectionId);
+          const client = clients.get(clientId);
+          if (!client || !clientOwnsConnection(client, owner)) return;
+
+          ws.send(JSON.stringify({
+            type: 'whatsappConnectionError',
+            connectionId: data.connectionId,
+            error: data.error
+          }));
         });
 
         const unsubscribeMessageReceived = whatsAppService.subscribeToEvents('messageReceived', (data) => {
@@ -3911,24 +3958,30 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
           }
         });
 
-        const unsubscribeWhatsAppOfficialConnectionStatus = whatsAppOfficialService.subscribeToEvents('connectionStatusUpdate', (data) => {
-          if (data && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({
-              type: 'whatsappOfficialConnectionStatus',
-              connectionId: data.connectionId,
-              status: data.status
-            }));
-          }
+        const unsubscribeWhatsAppOfficialConnectionStatus = whatsAppOfficialService.subscribeToEvents('connectionStatusUpdate', async (data) => {
+          if (!data || ws.readyState !== WebSocket.OPEN) return;
+          const owner = await resolveConnectionOwner(data.connectionId);
+          const client = clients.get(clientId);
+          if (!client || !clientOwnsConnection(client, owner)) return;
+
+          ws.send(JSON.stringify({
+            type: 'whatsappOfficialConnectionStatus',
+            connectionId: data.connectionId,
+            status: data.status
+          }));
         });
 
-        const unsubscribeWhatsAppOfficialConnectionError = whatsAppOfficialService.subscribeToEvents('connectionError', (data) => {
-          if (data && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({
-              type: 'whatsappOfficialConnectionError',
-              connectionId: data.connectionId,
-              error: data.error
-            }));
-          }
+        const unsubscribeWhatsAppOfficialConnectionError = whatsAppOfficialService.subscribeToEvents('connectionError', async (data) => {
+          if (!data || ws.readyState !== WebSocket.OPEN) return;
+          const owner = await resolveConnectionOwner(data.connectionId);
+          const client = clients.get(clientId);
+          if (!client || !clientOwnsConnection(client, owner)) return;
+
+          ws.send(JSON.stringify({
+            type: 'whatsappOfficialConnectionError',
+            connectionId: data.connectionId,
+            error: data.error
+          }));
         });
 
         const unsubscribeWhatsAppOfficialMessageReceived = whatsAppOfficialService.subscribeToEvents('newMessage', (data) => {
@@ -3942,24 +3995,30 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
           }
         });
 
-        const unsubscribeInstagramConnectionStatus = instagramService.subscribeToEvents('connectionStatusUpdate', (data) => {
-          if (data && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({
-              type: 'instagramConnectionStatus',
-              connectionId: data.connectionId,
-              status: data.status
-            }));
-          }
+        const unsubscribeInstagramConnectionStatus = instagramService.subscribeToEvents('connectionStatusUpdate', async (data) => {
+          if (!data || ws.readyState !== WebSocket.OPEN) return;
+          const owner = await resolveConnectionOwner(data.connectionId);
+          const client = clients.get(clientId);
+          if (!client || !clientOwnsConnection(client, owner)) return;
+
+          ws.send(JSON.stringify({
+            type: 'instagramConnectionStatus',
+            connectionId: data.connectionId,
+            status: data.status
+          }));
         });
 
-        const unsubscribeInstagramConnectionError = instagramService.subscribeToEvents('connectionError', (data) => {
-          if (data && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({
-              type: 'instagramConnectionError',
-              connectionId: data.connectionId,
-              error: data.error
-            }));
-          }
+        const unsubscribeInstagramConnectionError = instagramService.subscribeToEvents('connectionError', async (data) => {
+          if (!data || ws.readyState !== WebSocket.OPEN) return;
+          const owner = await resolveConnectionOwner(data.connectionId);
+          const client = clients.get(clientId);
+          if (!client || !clientOwnsConnection(client, owner)) return;
+
+          ws.send(JSON.stringify({
+            type: 'instagramConnectionError',
+            connectionId: data.connectionId,
+            error: data.error
+          }));
         });
 
         const unsubscribeInstagramMessageReceived = instagramService.subscribeToEvents('messageReceived', (data) => {
@@ -3976,24 +4035,30 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
           }
         });
 
-        const unsubscribeMessengerConnectionStatus = messengerService.subscribeToEvents('connectionStatusUpdate', (data) => {
-          if (data && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({
-              type: 'messengerConnectionStatus',
-              connectionId: data.connectionId,
-              status: data.status
-            }));
-          }
+        const unsubscribeMessengerConnectionStatus = messengerService.subscribeToEvents('connectionStatusUpdate', async (data) => {
+          if (!data || ws.readyState !== WebSocket.OPEN) return;
+          const owner = await resolveConnectionOwner(data.connectionId);
+          const client = clients.get(clientId);
+          if (!client || !clientOwnsConnection(client, owner)) return;
+
+          ws.send(JSON.stringify({
+            type: 'messengerConnectionStatus',
+            connectionId: data.connectionId,
+            status: data.status
+          }));
         });
 
-        const unsubscribeMessengerConnectionError = messengerService.subscribeToEvents('connectionError', (data) => {
-          if (data && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({
-              type: 'messengerConnectionError',
-              connectionId: data.connectionId,
-              error: data.error
-            }));
-          }
+        const unsubscribeMessengerConnectionError = messengerService.subscribeToEvents('connectionError', async (data) => {
+          if (!data || ws.readyState !== WebSocket.OPEN) return;
+          const owner = await resolveConnectionOwner(data.connectionId);
+          const client = clients.get(clientId);
+          if (!client || !clientOwnsConnection(client, owner)) return;
+
+          ws.send(JSON.stringify({
+            type: 'messengerConnectionError',
+            connectionId: data.connectionId,
+            error: data.error
+          }));
         });
 
         const unsubscribeMessengerMessageReceived = messengerService.subscribeToEvents('messageReceived', (data) => {
@@ -4968,6 +5033,39 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
 
       if (connection.channelType === 'whatsapp_unofficial') {
         try {
+          const user = req.user;
+          const defaultTemplateExists = await db.select().from(quickReplyTemplates)
+                .where(
+                  and(
+                    eq(quickReplyTemplates.companyId, user.companyId),
+                    eq(quickReplyTemplates.name, 'notify_contact_activity_personal')
+                  )
+                ).limit(1);
+
+          if( !defaultTemplateExists.length ) {
+
+            // Create Quick Reply Message Template
+            const maxSortOrder = await db.select({ max: quickReplyTemplates.sortOrder })
+                  .from(quickReplyTemplates)
+                  .where(
+                    eq(quickReplyTemplates.companyId, user.companyId)
+                  )
+                  .limit(1);
+            
+                const nextSortOrder = (maxSortOrder[0]?.max || 0) + 1;
+            
+                await db.insert(quickReplyTemplates).values({
+                  companyId: user.companyId,
+                  createdById: user.id,
+                  name: 'notify_contact_activity_personal',
+                  content: `Hola {{contact.name}}, un nuevo contacto llegó a tu cuenta, puedes revisarlo en el siguiente enlace:\nhttps://app.whatcem.com/contacts`,
+                  category: 'general',
+                  variables: [],
+                  sortOrder: nextSortOrder,
+                  isActive: true
+                }).returning();
+          }
+
           whatsAppService.connect(connection.id, req.user.id)
             .catch(err => console.error('Error connecting to WhatsApp:', err));
 

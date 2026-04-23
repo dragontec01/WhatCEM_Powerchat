@@ -4525,7 +4525,8 @@ export async function sendWhatsAppMessage(
   to: string,
   message: string,
   isFromBot: boolean = false,
-  conversationId?: number
+  conversationId?: number,
+  source: 'flow' | 'api' | 'web' = 'api',
 ): Promise<Message | null> {
 
   const startTime = Date.now();
@@ -4547,7 +4548,9 @@ export async function sendWhatsAppMessage(
       throw new Error('User not found');
     }
 
-    const hasConnectionAccess = await checkConnectionPermission(user, connection, conversationId, connectionId);
+    const hasConnectionAccess = source !== 'flow' 
+    ? await checkConnectionPermission(user, connection, conversationId, connectionId)
+    : true;
 
     if (!hasConnectionAccess) {
       throw new Error('You do not have permission to access this connection');

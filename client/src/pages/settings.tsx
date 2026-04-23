@@ -406,6 +406,27 @@ export default function Settings() {
     const reconnectInterval = 2000;
     const socketRef = { current: socket };
 
+    const resyncConnectionStatus = async () => {
+      const connectionId = activeConnectionIdRef.current;
+      if (!connectionId) return;
+      try {
+        const response = await fetch(`/api/whatsapp/status/${connectionId}`);
+        if (!response.ok) return;
+        const data = await response.json();
+        if (data?.status === 'active' || data?.status === 'connected') {
+          setConnectionStatus('connected');
+          setAwaitingManualQr(false);
+          setQrGenerationInProgress(false);
+        } else if (data?.status === 'error' || data?.status === 'logged_out') {
+          setConnectionStatus('error');
+          setAwaitingManualQr(false);
+          setQrGenerationInProgress(false);
+        }
+      } catch (error) {
+        console.error('Error resyncing WhatsApp connection status:', error);
+      }
+    };
+
 
     const handleWebSocketMessage = (event: MessageEvent) => {
       try {
@@ -482,6 +503,8 @@ export default function Settings() {
                 userId: currentUser.id
               }));
             }
+
+            resyncConnectionStatus();
           };
 
           newSocket.onmessage = handleWebSocketMessage;
@@ -516,6 +539,8 @@ export default function Settings() {
           userId: currentUser.id
         }));
       }
+
+      resyncConnectionStatus();
     };
 
     socket.onmessage = handleWebSocketMessage;
@@ -689,7 +714,7 @@ export default function Settings() {
             variant: "destructive"
           });
         }
-      }, 30000);
+      }, 60000);
 
       setQrGenerationTimeout(timeout);
 

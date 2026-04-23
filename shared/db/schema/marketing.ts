@@ -112,6 +112,13 @@ export const quickReplyTemplates = pgTable("quick_reply_templates", {
   updatedAt: timestamp("updated_at").notNull().defaultNow()
 });
 
+export const insertQuickReplyTemplateSchema = createInsertSchema(quickReplyTemplates).pick({
+  companyId: true,
+  createdById: true,
+  name: true,
+  content: true,
+});
+
 export const contactSegments = pgTable("contact_segments", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull().references(() => companies.id),
@@ -450,6 +457,9 @@ export const calls = pgTable("calls", {
 
 export type CampaignTemplate = typeof campaignTemplates.$inferSelect;
 export type InsertCampaignTemplate = z.infer<typeof insertCampaignTemplateSchema>;
+
+export type QuickReplyTemplate = typeof quickReplyTemplates.$inferSelect;
+export type InsertQuickReplyTemplate = z.infer<typeof insertQuickReplyTemplateSchema>;
 
 export type ContactSegment = typeof contactSegments.$inferSelect;
 export type InsertContactSegment = z.infer<typeof insertContactSegmentSchema>;
