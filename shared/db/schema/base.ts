@@ -70,6 +70,8 @@ export const PERMISSIONS = {
   MANAGE_BACKUPS: 'manage_backups',
   
   CREATE_CALL_CONFIGURATIONS: 'create_call_configurations',
+  VIEW_CALL_CONFIGURATIONS: 'view_call_configurations',
+  MANAGE_CALL_CONFIGURATIONS: 'manage_call_configurations',
 
   VIEW_CALL_LOGS: 'view_call_logs',
 

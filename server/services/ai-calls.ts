@@ -2,10 +2,10 @@ import axios, { AxiosError, AxiosInstance } from "axios";
 
 class AICallsService {
 
-    private client: AxiosInstance;
+    private aiCallsService: AxiosInstance;
 
     constructor() {
-        this.client = axios.create({
+        this.aiCallsService = axios.create({
             baseURL: process.env.AI_CALLS_SERVICE_URL,
             headers: {
                 "Content-Type": "application/json",
@@ -15,7 +15,7 @@ class AICallsService {
     }
 
     /** POST /call — triggers an immediate outbound AI call */
-    async makeCall(payload: {
+    /* async makeCall(payload: {
         to: string;
         contact_name?: string | null;
         custom_instructions?: string | null;
@@ -27,20 +27,18 @@ class AICallsService {
             console.error("Error making call:", (error as AxiosError)?.response?.data || error);
             throw error;
         }
-    }
+    } */
 
     /** POST /schedule-call — schedules a future call */
     async scheduleCall(payload: {
-        phone: string;
+        config_id: number;
+        to: string;
         scheduled_for: string;
         contact_name?: string | null;
         custom_instructions?: string | null;
     }) {
         try {
-            const response = await this.client.post("/schedule-call", {
-                phone: payload.phone,
-                scheduled_for: payload.scheduled_for,
-            });
+            const response = await this.aiCallsService.post("/api/v1/schedule", payload);
             return response.data; // { ok, id, scheduled_for }
         } catch (error) {
             console.error("Error scheduling call:", (error as AxiosError)?.response?.data || error);
@@ -48,6 +46,16 @@ class AICallsService {
         }
     }
     
+    async createConfiguration(config: any) {
+        try {
+            const response = await this.aiCallsService.post("/api/v1/configurations", config);
+            return response.data;
+        } catch (error) {
+            console.error("Error creating configuration:", (error as AxiosError)?.response?.data || error);
+            throw error;
+        }
+    }
+
     async makeCall(payload: Record<string, unknown>) {
         try {
             const response = await this.aiCallsService.post("/api/v1/call", payload);
@@ -61,7 +69,7 @@ class AICallsService {
     /** POST /scheduled-calls/:id/cancel — cancels a pending scheduled call */
     async cancelScheduledCall(id: string | number) {
         try {
-            const response = await this.client.post(`/scheduled-calls/${id}/cancel`);
+            const response = await this.aiCallsService.post(`/scheduled-calls/${id}/cancel`);
             return response.data;
         } catch (error) {
             console.error("Error cancelling scheduled call:", (error as AxiosError)?.response?.data || error);
@@ -72,7 +80,7 @@ class AICallsService {
     /** POST /prompt-settings — syncs system message + greeting to the voice bot */
     async syncPrompts(systemMessage: string, greetingPrompt: string) {
         try {
-            const response = await this.client.post("/prompt-settings", {
+            const response = await this.aiCallsService.post("/prompt-settings", {
                 system_message: systemMessage,
                 greeting_prompt: greetingPrompt,
             });
@@ -86,7 +94,7 @@ class AICallsService {
     /** GET /api/scheduled-calls — lists all scheduled calls from the voice bot */
     async getScheduledCalls() {
         try {
-            const response = await this.client.get("/api/scheduled-calls");
+            const response = await this.aiCallsService.get("/api/scheduled-calls");
             return response.data;
         } catch (error) {
             console.error("Error fetching scheduled calls:", (error as AxiosError)?.response?.data || error);

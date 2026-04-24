@@ -18,7 +18,7 @@ import adminAiCredentialsRoutes from "./routes/admin-ai-credentials";
 import { parseDialog360Error, createErrorResponse } from "./services/channels/360dialog-errors";
 import { validatePhoneNumber } from "./utils/phone-validation";
 import { logger } from "./utils/logger";
-import { databaseBackupLogs, callConfiguration } from "../shared/db/schema";
+import { databaseBackupLogs, callConfiguration, insertCallConfigurationSchema } from "../shared/db/schema";
 import { desc, sql, eq } from "drizzle-orm";
 import { invalidateSubdomainCache } from "./middleware/subdomain";
 import AICallsService from "./services/ai-calls";
@@ -4279,30 +4279,39 @@ function registerAdminRoutes(app: Express) {
   // ============================================================
   // AI Call Configuration (legacy endpoint)
   // ============================================================
-  app.post("/api/admin/ai-call-configurations", ensureSuperAdmin, async (req: Request, res: Response) => {
-    const bodySchema = z.object({
-      companyId: z.number().int().positive().optional().nullable(),
-      systemPrompt: z.string().optional().nullable(),
-      greetingPrompt: z.string().optional().nullable(),
-      openaiApiKey: z.string().max(255).optional().nullable(),
-      twlAccountSid: z.string().max(255).optional().nullable(),
-      twlAuthToken: z.string().max(255).optional().nullable(),
-      twlPhoneNumber: z.string().max(50).optional().nullable(),
-      voiceModel: z.string().max(50).optional().default("gpt-3.5-turbo"),
-    });
+  app.post("/api/admin/companies/:id/call-configuration", ensureSuperAdmin, async (req: Request, res: Response) => {
+    const companyId = parseInt(req.params.id, 10) || req.user?.companyId; // Allow companyId from body for flexibility
+    if (!companyId) {
+      return res.status(403).json({ success: false, error: 'Company ID not found in session' });
+    }
 
-    const parsed = bodySchema.safeParse(req.body);
+    const bodySchema = insertCallConfigurationSchema;
+    const aiCallsService = new AICallsService();
+
+    const parsed = bodySchema.safeParse({...req.body, voiceModel: req.body.voiceModel || 'shimmer', companyId });
     if (!parsed.success) {
-      return res.status(400).json({ error: "Invalid request body", details: parsed.error.flatten() });
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid request body',
+        details: parsed.error.message[0],
+      });
     }
 
     try {
-      const aiCallsService = new AICallsService()
-      const result = await aiCallsService.createConfiguration(parsed.data);
-      return res.status(201).json(result);
+      const result = await aiCallsService.createConfiguration({
+        system_prompt: parsed.data.systemPrompt,
+        greeting_prompt: parsed.data.greetingPrompt,
+        openai_api_key: parsed.data.openaiApiKey,
+        twl_account_sid: parsed.data.twlAccountSid,
+        twl_auth_token: parsed.data.twlAuthToken,
+        twl_phone_number: parsed.data.twlPhoneNumber,
+        voice_model: parsed.data.voiceModel, 
+        company_id: companyId, 
+      });
+      return res.status(201).json({ success: true, data: result });
     } catch (error) {
-      logger.error("ai-calls", "Error creating AI call configuration", error);
-      return res.status((error as AxiosError).response?.status || 500).json({ error: "Failed to create AI call configuration" });
+      console.error('Error creating configuration', error);
+      return res.status(500).json({ success: false, error: error instanceof Error ? error.message : String(error) });
     }
   });
 

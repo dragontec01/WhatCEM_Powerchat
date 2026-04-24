@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -98,6 +99,8 @@ export default function VoiceAssistant() {
   const [schedName, setSchedName] = useState('');
   const [schedTime, setSchedTime] = useState('');
   const [schedInstructions, setSchedInstructions] = useState('');
+  const [useDefaultGreetingNow, setUseDefaultGreetingNow] = useState(true);
+  const [useDefaultGreetingSched, setUseDefaultGreetingSched] = useState(true);
 
   // Configuración de voz (local edits)
   const [voice, setVoice] = useState('shimmer');
@@ -177,6 +180,7 @@ export default function VoiceAssistant() {
       const res = await apiRequest('POST', '/api/ai-calls/call', {
         phoneNumber: nowPhone,
         customInstructions: nowInstructions || null,
+        useDefaultGreeting: useDefaultGreetingNow,
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Error al iniciar llamada');
@@ -186,6 +190,7 @@ export default function VoiceAssistant() {
       toast({ title: 'Llamada iniciada', description: `SID: ${data.data?.call_sid ?? '—'}` });
       setNowPhone('');
       setNowInstructions('');
+      setUseDefaultGreetingNow(true);
       setTimeout(() => queryClient.invalidateQueries({ queryKey: ['/api/ai-calls/call-logs'] }), 3000);
     },
     onError: (e: Error) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
@@ -199,6 +204,7 @@ export default function VoiceAssistant() {
         contactName: schedName || null,
         scheduledFor: new Date(schedTime).toISOString(),
         customInstructions: schedInstructions || null,
+        useDefaultGreeting: useDefaultGreetingSched,
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Error al programar');
@@ -209,6 +215,7 @@ export default function VoiceAssistant() {
       setSchedPhone('');
       setSchedName('');
       setSchedInstructions('');
+      setUseDefaultGreetingSched(true);
       queryClient.invalidateQueries({ queryKey: ['/api/ai-calls/scheduled-calls', callConfig?.id] });
     },
     onError: (e: Error) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
@@ -308,9 +315,23 @@ export default function VoiceAssistant() {
                       onChange={e => setNowPhone(e.target.value)}
                     />
                   </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="defaultGreetingNow"
+                      checked={useDefaultGreetingNow}
+                      onCheckedChange={val => setUseDefaultGreetingNow(val === true)}
+                    />
+                    <Label htmlFor="defaultGreetingNow" className="text-sm text-gray-700 font-normal cursor-pointer">
+                      Usar saludo inicial por defecto
+                    </Label>
+                  </div>
                   <div>
                     <Label className="text-sm font-medium text-gray-700">
-                      Instrucciones específicas <span className="text-gray-400 font-normal">(opcional)</span>
+                      Instrucciones específicas{' '}
+                      {useDefaultGreetingNow
+                        ? <span className="text-gray-400 font-normal">(opcional)</span>
+                        : <span className="text-red-500 font-normal">*</span>
+                      }
                     </Label>
                     <Textarea
                       className="mt-1 resize-none"
@@ -323,7 +344,7 @@ export default function VoiceAssistant() {
                   <Button
                     className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold"
                     onClick={() => callNow.mutate()}
-                    disabled={!nowPhone || callNow.isPending || !hasCredentials}
+                    disabled={!nowPhone || callNow.isPending || !hasCredentials || (!useDefaultGreetingNow && !nowInstructions)}
                   >
                     {callNow.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <PhoneCall className="h-4 w-4 mr-2" />}
                     Llamar ahora
@@ -355,9 +376,23 @@ export default function VoiceAssistant() {
                     <Label className="text-sm font-medium text-gray-700">Fecha y hora</Label>
                     <Input className="mt-1" type="datetime-local" value={schedTime} onChange={e => setSchedTime(e.target.value)} />
                   </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="defaultGreetingSched"
+                      checked={useDefaultGreetingSched}
+                      onCheckedChange={val => setUseDefaultGreetingSched(val === true)}
+                    />
+                    <Label htmlFor="defaultGreetingSched" className="text-sm text-gray-700 font-normal cursor-pointer">
+                      Usar saludo inicial por defecto
+                    </Label>
+                  </div>
                   <div>
                     <Label className="text-sm font-medium text-gray-700">
-                      Instrucciones específicas <span className="text-gray-400 font-normal">(opcional)</span>
+                      Instrucciones específicas{' '}
+                      {useDefaultGreetingSched
+                        ? <span className="text-gray-400 font-normal">(opcional)</span>
+                        : <span className="text-red-500 font-normal">*</span>
+                      }
                     </Label>
                     <Textarea
                       className="mt-1 resize-none"
@@ -370,7 +405,7 @@ export default function VoiceAssistant() {
                   <Button
                     className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold"
                     onClick={() => scheduleCall.mutate()}
-                    disabled={!schedPhone || !schedTime || scheduleCall.isPending || !hasCredentials || !callConfig?.id}
+                    disabled={!schedPhone || !schedTime || scheduleCall.isPending || !hasCredentials || !callConfig?.id || (!useDefaultGreetingSched && !schedInstructions)}
                   >
                     {scheduleCall.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                     Programar llamada

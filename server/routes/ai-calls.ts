@@ -4,7 +4,7 @@ import { db } from '../db.js';
 import { callLogs, scheduledCalls, insertCallConfigurationSchema, callConfiguration } from '../../shared/db/schema/calls_ai.js';
 import { eq, and, desc } from 'drizzle-orm';
 import AICallsService from '../services/ai-calls.js';
-import { requireAnyPermission } from 'server/middleware.js';
+import { ensureAuthenticated, requireAnyPermission } from 'server/middleware.js';
 import logger from '@shared/logger.js';
 import { DEFAULT_AXIOS_CONFIG_OVERRIDES } from 'node_modules/@paypal/paypal-server-sdk/dist/esm/types/clientAdapter.js';
 
@@ -19,7 +19,7 @@ const getErrorMessage = (error: unknown): string =>
 // Returns this company's call_configuration (no credentials exposed).
 // If no config exists yet, returns { data: null, hasCredentials: false }.
 // ============================================================
-router.get('/config', async (req, res) => {
+router.get('/config', ensureAuthenticated, async (req, res) => {
   const companyId = req.user?.companyId;
   if (!companyId) {
     return res.status(403).json({ success: false, error: 'Company ID not found in session' });
@@ -58,7 +58,7 @@ router.get('/config', async (req, res) => {
 // Company users update their own voice model + prompts.
 // Also syncs prompts to the voice bot so they apply from the next call.
 // ============================================================
-router.patch('/config', async (req, res) => {
+router.patch('/config', ensureAuthenticated, async (req, res) => {
   const companyId = req.user?.companyId;
   if (!companyId) {
     return res.status(403).json({ success: false, error: 'Company ID not found in session' });
@@ -105,16 +105,6 @@ router.patch('/config', async (req, res) => {
         twlPhoneNumber: callConfiguration.twlPhoneNumber,
       });
 
-    // Sync prompts to voice bot (non-fatal if it fails)
-    try {
-      await aiCallsService.syncPrompts(
-        parsed.data.systemPrompt ?? '',
-        parsed.data.greetingPrompt ?? '',
-      );
-    } catch (syncErr) {
-      logger.warn('call-ai', 'Could not sync prompts to voice bot:', syncErr);
-    }
-
     return res.json({ success: true, data: updated });
   } catch (error) {
     logger.error('call-ai', 'Error updating config:', error);
@@ -127,7 +117,7 @@ router.patch('/config', async (req, res) => {
 // Makes an immediate AI call via the voice bot's POST /call endpoint.
 // Inserts a call_log row so history is tracked.
 // ============================================================
-router.post('/call', async (req, res) => {
+router.post('/call', ensureAuthenticated, async (req, res) => {
   const companyId = req.user?.companyId;
   if (!companyId) {
     return res.status(403).json({ success: false, error: 'Company ID not found in session' });
@@ -137,11 +127,15 @@ router.post('/call', async (req, res) => {
     phoneNumber: z.string().min(1).max(50),
     contactName: z.string().max(100).optional().nullable(),
     customInstructions: z.string().optional().nullable(),
+    useDefaultGreeting: z.boolean().default(true),
   });
 
   const parsed = bodySchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ success: false, error: 'Invalid request body', details: parsed.error.flatten() });
+  }
+  if(!parsed.data.useDefaultGreeting && !parsed.data.customInstructions) {
+    return res.status(400).json({ success: false, error: 'Custom instructions are required if not using the default greeting.' });
   }
 
   try {
@@ -164,30 +158,14 @@ router.post('/call', async (req, res) => {
 
     // Voice bot uses its own .env credentials. We only pass the destination number.
     const result = await aiCallsService.makeCall({
+      config_id: config.id,
       to: parsed.data.phoneNumber,
       contact_name: parsed.data.contactName ?? null,
-      custom_instructions: parsed.data.customInstructions ?? null,
+      custom_instructions: `${parsed.data.useDefaultGreeting ? config.greetingPrompt : ''}\n\n ${parsed.data.customInstructions ?? ''}`.trim(),
     });
 
     if (!result.ok) {
       return res.status(400).json({ success: false, error: result.error ?? 'Voice bot rejected the call' });
-    }
-
-    // Insert call_log so history appears in the UI immediately
-    if (result.sid) {
-      try {
-        await db.insert(callLogs).values({
-          callConfigurationId: config.id,
-          companyId,
-          phoneNumber: parsed.data.phoneNumber,
-          callSid: result.sid,
-          status: 'initiated',
-          systemPrompt: config.systemPrompt ?? '',
-          greetingPrompt: config.greetingPrompt ?? '',
-        });
-      } catch (insertErr) {
-        logger.warn('call-ai', 'Could not insert call_log:', insertErr);
-      }
     }
 
     logger.info('call-ai', `Call initiated → SID: ${result.sid}, to: ${parsed.data.phoneNumber}`);
@@ -236,7 +214,7 @@ router.post('/webhook', async (req, res) => {
 // Schedules a future call via voice bot's POST /schedule-call.
 // Stores the result in our DB for UI display and cancellation.
 // ============================================================
-router.post('/scheduled-calls', async (req, res) => {
+router.post('/scheduled-calls', ensureAuthenticated, async (req, res) => {
   const companyId = req.user?.companyId;
   if (!companyId) {
     return res.status(403).json({ success: false, error: 'Company ID not found in session' });
@@ -246,14 +224,17 @@ router.post('/scheduled-calls', async (req, res) => {
     phoneNumber: z.string().min(1).max(50),
     contactName: z.string().max(100).optional().nullable(),
     customInstructions: z.string().optional().nullable(),
-    systemPrompt: z.string().optional().nullable(),
-    greetingPrompt: z.string().optional().nullable(),
     scheduledFor: z.string().datetime(),
+    useDefaultGreeting: z.boolean().default(true),
   });
 
   const parsed = bodySchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ success: false, error: 'Invalid request body', details: parsed.error.flatten() });
+  }
+
+  if(!parsed.data.useDefaultGreeting && !parsed.data.customInstructions) {
+    return res.status(400).json({ success: false, error: 'Custom instructions are required if not using the default greeting.' });
   }
 
   const configuration = await db
@@ -270,28 +251,18 @@ router.post('/scheduled-calls', async (req, res) => {
       .replace(/\.\d{3}Z$/, '');
 
     const result = await aiCallsService.scheduleCall({
-      phone: parsed.data.phoneNumber,
+      config_id: configuration?.id,
+      to: parsed.data.phoneNumber,
       scheduled_for: scheduledForLocal,
       contact_name: parsed.data.contactName ?? null,
-      custom_instructions: parsed.data.customInstructions ?? null,
+      custom_instructions: `${parsed.data.useDefaultGreeting ? configuration?.greetingPrompt : ''}\n\n${parsed.data.customInstructions ?? ''}`.trim(),
     });
 
     if (!result.ok) {
       return res.status(400).json({ success: false, error: result.error ?? 'Voice bot rejected the scheduled call' });
     }
 
-    // Store in our DB — voice bot numeric id is stored in callSid for later cancellation
-    const [inserted] = await db.insert(scheduledCalls).values({
-      companyId,
-      phoneNumber: parsed.data.phoneNumber,
-      contactName: parsed.data.contactName ?? null,
-      customInstructions: parsed.data.customInstructions ?? null,
-      scheduledFor: new Date(parsed.data.scheduledFor),
-      status: 'pending',
-      callSid: String(result.id),
-    }).returning();
-
-    return res.status(201).json({ success: true, data: inserted });
+    return res.status(201).json({ success: true, data: result.data });
   } catch (error) {
     logger.error('call-ai', 'Error scheduling call:', error);
     return res.status(500).json({ success: false, error: getErrorMessage(error) });
@@ -302,7 +273,7 @@ router.post('/scheduled-calls', async (req, res) => {
 // POST /api/ai-calls/call
 // Forwards a new call to the external AI calls service
 // ============================================================
-router.post('/call', requireAnyPermission(['create_scheduled_calls']), async (req, res) => {
+router.post('/call', ensureAuthenticated, async (req, res) => {
   const companyId = req.user?.companyId;
   if (!companyId) {
     return res.status(403).json({ success: false, error: 'Company ID not found in session' });
@@ -352,7 +323,7 @@ router.post('/call', requireAnyPermission(['create_scheduled_calls']), async (re
 // GET /api/ai-calls/call-logs
 // Returns call logs for this company.
 // ============================================================
-router.get('/call-logs', async (req, res) => {
+router.get('/call-logs', ensureAuthenticated, async (req, res) => {
   const companyId = req.user?.companyId;
   if (!companyId) {
     return res.status(403).json({ success: false, error: 'Company ID not found in session' });
@@ -389,7 +360,7 @@ router.get('/call-logs', async (req, res) => {
 // GET /api/ai-calls/scheduled-calls/:configId
 // Returns scheduled calls for this company from our DB.
 // ============================================================
-router.get('/scheduled-calls/:configId', async (req, res) => {
+router.get('/scheduled-calls/:configId', ensureAuthenticated, async (req, res) => {
   const companyId = req.user?.companyId;
   if (!companyId) {
     return res.status(403).json({ success: false, error: 'Company ID not found in session' });
@@ -421,7 +392,7 @@ router.get('/scheduled-calls/:configId', async (req, res) => {
 // DELETE /api/ai-calls/scheduled-calls/:callSid
 // Cancels a scheduled call. callSid holds the voice bot's numeric id.
 // ============================================================
-router.delete('/scheduled-calls/:callSid', async (req, res) => {
+router.delete('/scheduled-calls/:callSid', ensureAuthenticated, async (req, res) => {
   const companyId = req.user?.companyId;
   if (!companyId) {
     return res.status(403).json({ success: false, error: 'Company ID not found in session' });
@@ -462,7 +433,7 @@ router.delete('/scheduled-calls/:callSid', async (req, res) => {
 // POST /api/ai-calls/configurations  (admin use)
 // Kept for backward compatibility but no longer calls voice bot.
 // ============================================================
-router.post('/configurations', requireAnyPermission(['create_call_configurations']), async (_req, res) => {
+router.post('/configurations', ensureAuthenticated, async (_req, res) => {
   return res.status(501).json({ success: false, error: 'Use the admin panel to set credentials.' });
 });
 

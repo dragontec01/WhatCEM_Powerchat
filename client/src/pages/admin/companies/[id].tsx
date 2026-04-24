@@ -430,7 +430,7 @@ export default function CompanyDetailPage() {
   // ── IA Calls: save config ────────────────────────────────────
   const saveCallConfigMutation = useMutation({
     mutationFn: async (data: typeof callConfig) => {
-      const res = await apiRequest("PUT", `/api/admin/companies/${companyId}/call-configuration`, data);
+      const res = await apiRequest(callConfigData?.data ? "PUT" : "POST", `/api/admin/companies/${companyId}/call-configuration`, data);
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || "Failed to save call configuration");
