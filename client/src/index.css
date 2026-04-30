@@ -388,7 +388,7 @@
 }
 
 button[role="checkbox"] {
-  border: 2px solid hsl(var(--border)) ;
+  border: 2px solid #CCC !important;
   background-color: hsl(var(--background)) ;
   min-width: 16px !important;
   min-height: 16px !important;
@@ -399,8 +399,8 @@ button[role="checkbox"]:hover {
 }
 
 button[role="checkbox"][data-state="checked"] {
-  background-color: hsl(var(--primary)) ;
-  border-color: hsl(var(--primary));
+  background-color: hsl(var(--accent-foreground)) ;
+  border-color: hsl(var(--border)) !important;
 }
 
 button[role="checkbox"][data-state="checked"] svg {

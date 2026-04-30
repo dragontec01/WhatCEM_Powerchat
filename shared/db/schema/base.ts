@@ -67,7 +67,17 @@ export const PERMISSIONS = {
 
   CREATE_BACKUPS: 'create_backups',
   RESTORE_BACKUPS: 'restore_backups',
-  MANAGE_BACKUPS: 'manage_backups'
+  MANAGE_BACKUPS: 'manage_backups',
+  
+  CREATE_CALL_CONFIGURATIONS: 'create_call_configurations',
+  VIEW_CALL_CONFIGURATIONS: 'view_call_configurations',
+  MANAGE_CALL_CONFIGURATIONS: 'manage_call_configurations',
+
+  VIEW_CALL_LOGS: 'view_call_logs',
+
+  CREATE_SCHEDULED_CALLS: 'create_scheduled_calls',
+  VIEW_SCHEDULED_CALLS: 'view_scheduled_calls',
+  MANAGE_SCHEDULED_CALLS: 'manage_scheduled_calls'
 } as const;
 
 export const DEFAULT_ROLE_PERMISSIONS = {
@@ -107,7 +117,12 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     [PERMISSIONS.MANAGE_TASKS]: true,
     [PERMISSIONS.CREATE_BACKUPS]: true,
     [PERMISSIONS.RESTORE_BACKUPS]: true,
-    [PERMISSIONS.MANAGE_BACKUPS]: true
+    [PERMISSIONS.MANAGE_BACKUPS]: true,
+    [PERMISSIONS.CREATE_CALL_CONFIGURATIONS]: true,
+    [PERMISSIONS.VIEW_CALL_LOGS]: true,
+    [PERMISSIONS.CREATE_SCHEDULED_CALLS]: true,
+    [PERMISSIONS.VIEW_SCHEDULED_CALLS]: true,
+    [PERMISSIONS.MANAGE_SCHEDULED_CALLS]: true
   },
   agent: {
     [PERMISSIONS.VIEW_ALL_CONVERSATIONS]: false,

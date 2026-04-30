@@ -62,6 +62,7 @@ import AccessDenied from "@/pages/AccessDenied";
 import { Loader2 } from "lucide-react";
 import PagesPage from "./pages/pages";
 import LandingPage from "./pages/landing";
+import VoiceAssistant from "./pages/voice-assistant";
 import ProtectedLandingPage from "./components/ProtectedLandingPage";
 import Templates from "./pages/templates";
 import RootRedirect from "./components/RootRedirect";
@@ -159,6 +160,8 @@ function Router() {
             <Analytics />
           </AnalyticsRoute>
         </Route>
+
+        <ProtectedRoute path="/voice-assistant" component={VoiceAssistant} />
 
         <Route path="/settings">
           <SettingsRoute>

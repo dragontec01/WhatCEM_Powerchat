@@ -12,15 +12,16 @@ import { pool, db } from "./db";
 import { ensureSuperAdmin } from "./middleware";
 import nodemailer from "nodemailer";
 import { createCipheriv, createDecipheriv, randomBytes as cryptoRandomBytes } from "crypto";
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 import { registerAffiliateRoutes } from "./routes/admin/affiliate-routes";
 import adminAiCredentialsRoutes from "./routes/admin-ai-credentials";
 import { parseDialog360Error, createErrorResponse } from "./services/channels/360dialog-errors";
 import { validatePhoneNumber } from "./utils/phone-validation";
 import { logger } from "./utils/logger";
-import { databaseBackupLogs } from "../shared/db/schema";
-import { desc, sql } from "drizzle-orm";
+import { databaseBackupLogs, callConfiguration, insertCallConfigurationSchema } from "../shared/db/schema";
+import { desc, sql, eq } from "drizzle-orm";
 import { invalidateSubdomainCache } from "./middleware/subdomain";
+import AICallsService from "./services/ai-calls";
 
 interface SMTPConfig {
   enabled: boolean;
@@ -4272,6 +4273,172 @@ function registerAdminRoutes(app: Express) {
     } catch (error) {
       console.error("Error clearing company data:", error);
       res.status(500).json({ error: "Failed to clear company data" });
+    }
+  });
+
+  // ============================================================
+  // AI Call Configuration (legacy endpoint)
+  // ============================================================
+  app.post("/api/admin/companies/:id/call-configuration", ensureSuperAdmin, async (req: Request, res: Response) => {
+    const companyId = parseInt(req.params.id, 10) || req.user?.companyId; // Allow companyId from body for flexibility
+    if (!companyId) {
+      return res.status(403).json({ success: false, error: 'Company ID not found in session' });
+    }
+
+    const bodySchema = insertCallConfigurationSchema;
+    const aiCallsService = new AICallsService();
+
+    const parsed = bodySchema.safeParse({...req.body, voiceModel: req.body.voiceModel || 'shimmer', companyId });
+    if (!parsed.success) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid request body',
+        details: parsed.error.message[0],
+      });
+    }
+
+    try {
+      const result = await aiCallsService.createConfiguration({
+        system_prompt: parsed.data.systemPrompt,
+        greeting_prompt: parsed.data.greetingPrompt,
+        openai_api_key: parsed.data.openaiApiKey,
+        twl_account_sid: parsed.data.twlAccountSid,
+        twl_auth_token: parsed.data.twlAuthToken,
+        twl_phone_number: parsed.data.twlPhoneNumber,
+        voice_model: parsed.data.voiceModel, 
+        company_id: companyId, 
+      });
+      return res.status(201).json({ success: true, data: result });
+    } catch (error) {
+      console.error('Error creating configuration', error);
+      return res.status(500).json({ success: false, error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // ============================================================
+  // GET /api/admin/companies/:id/call-configuration
+  // Returns the call_configuration row for a company, or null if none exists.
+  // ============================================================
+  app.get("/api/admin/companies/:id/call-configuration", ensureSuperAdmin, async (req: Request, res: Response) => {
+    const companyId = parseInt(req.params.id, 10);
+    if (isNaN(companyId)) {
+      return res.status(400).json({ error: "Invalid company ID" });
+    }
+
+    try {
+      const [config] = await db
+        .select()
+        .from(callConfiguration)
+        .where(eq(callConfiguration.companyId, companyId))
+        .limit(1);
+
+      return res.json({ data: config ?? null });
+    } catch (error) {
+      logger.error("ai-calls", "Error fetching call configuration", error);
+      return res.status(500).json({ error: "Failed to fetch call configuration" });
+    }
+  });
+
+  // ============================================================
+  // PUT /api/admin/companies/:id/call-configuration
+  // Creates or updates (upserts) the call_configuration for a company.
+  // ============================================================
+  app.put("/api/admin/companies/:id/call-configuration", ensureSuperAdmin, async (req: Request, res: Response) => {
+    const companyId = parseInt(req.params.id, 10);
+    if (isNaN(companyId)) {
+      return res.status(400).json({ error: "Invalid company ID" });
+    }
+
+    // Admin only sets credentials — voice/prompts are managed by the company itself
+    const bodySchema = z.object({
+      openaiApiKey: z.string().max(255).optional().nullable(),
+      twlAccountSid: z.string().max(255).optional().nullable(),
+      twlAuthToken: z.string().max(255).optional().nullable(),
+      twlPhoneNumber: z.string().max(50).optional().nullable(),
+    });
+
+    const parsed = bodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Invalid request body", details: parsed.error.flatten() });
+    }
+
+    try {
+      const [existing] = await db
+        .select()
+        .from(callConfiguration)
+        .where(eq(callConfiguration.companyId, companyId))
+        .limit(1);
+
+      let result;
+      if (existing) {
+        [result] = await db
+          .update(callConfiguration)
+          .set({
+            openaiApiKey: parsed.data.openaiApiKey ?? null,
+            twlAccountSid: parsed.data.twlAccountSid ?? null,
+            twlAuthToken: parsed.data.twlAuthToken ?? null,
+            twlPhoneNumber: parsed.data.twlPhoneNumber ?? null,
+          })
+          .where(eq(callConfiguration.id, existing.id))
+          .returning();
+      } else {
+        [result] = await db
+          .insert(callConfiguration)
+          .values({
+            companyId,
+            openaiApiKey: parsed.data.openaiApiKey ?? null,
+            twlAccountSid: parsed.data.twlAccountSid ?? null,
+            twlAuthToken: parsed.data.twlAuthToken ?? null,
+            twlPhoneNumber: parsed.data.twlPhoneNumber ?? null,
+            voiceModel: 'shimmer', // default, company will customize later
+          })
+          .returning();
+      }
+
+      return res.json({ data: result });
+    } catch (error) {
+      logger.error("ai-calls", "Error saving call configuration", error);
+      return res.status(500).json({ error: "Failed to save call configuration" });
+    }
+  });
+
+  // ============================================================
+  // DELETE /api/admin/companies/:id/call-configuration
+  // Clears all credentials (nulls them out) without deleting the row.
+  // Prompts and voiceModel are preserved.
+  // ============================================================
+  app.delete("/api/admin/companies/:id/call-configuration", ensureSuperAdmin, async (req: Request, res: Response) => {
+    const companyId = parseInt(req.params.id, 10);
+    if (isNaN(companyId)) {
+      return res.status(400).json({ error: "Invalid company ID" });
+    }
+
+    try {
+      const [existing] = await db
+        .select({ id: callConfiguration.id })
+        .from(callConfiguration)
+        .where(eq(callConfiguration.companyId, companyId))
+        .limit(1);
+
+      if (!existing) {
+        return res.status(404).json({ error: "No call configuration found for this company" });
+      }
+
+      await db
+        .update(callConfiguration)
+        .set({
+          openaiApiKey:  null,
+          twlAccountSid: null,
+          twlAuthToken:  null,
+          twlPhoneNumber: null,
+        })
+        .where(eq(callConfiguration.id, existing.id));
+
+      logger.info("ai-calls", `Credentials cleared for companyId ${companyId} by super admin`);
+      return res.json({ success: true });
+    } catch (error) {
+      logger.error("ai-calls", "Error clearing call configuration credentials", error);
+      return res.status(500).json({ error: "Failed to clear credentials" });
     }
   });
 }
